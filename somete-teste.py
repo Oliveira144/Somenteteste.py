@@ -145,8 +145,10 @@ def eco_parcial_por_linha(h):
         return "Poucos dados"
     ult = h[-9:]
     penult = h[-18:-9]
-    semelhantes = sum(1 for a, b in zip(penult, ult) if a == b or (a in ['C','V'] and b in ['C','V'])
-    return f"{semelhantes}/9"
+    # CORREÇÃO APLICADA AQUI
+    semelhantes = sum(1 for a, b in zip(penult, ult) 
+                   if a == b or (a in ['C','V'] and b in ['C','V']))
+    return f"{semelhantes}/9 semelhantes"
 
 def dist_empates(h):
     h = get_valores(h)
