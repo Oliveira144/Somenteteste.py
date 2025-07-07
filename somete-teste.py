@@ -1,6 +1,6 @@
 import streamlit as st
 
-# 🚀 Histórico expandido
+# Histórico expandido
 if "historico" not in st.session_state:
     st.session_state.historico = []
 
@@ -9,11 +9,10 @@ def adicionar_resultado(valor):
     if len(st.session_state.historico) > 300:
         st.session_state.historico.pop(0)
 
-# 🔍 Zona ativa: últimos 27 válidos (3 linhas)
 def get_valores(h):
     return [r for r in h if r in ["C", "V", "E"]][-27:]
 
-# 🎯 Funções preditivas com zona ativa
+# Funções preditivas
 def maior_sequencia(h):
     h = get_valores(h)
     max_seq = atual = 1
@@ -80,24 +79,19 @@ def tendencia_final(h):
     ult = h[-5:]
     return f"{ult.count('C')}C / {ult.count('V')}V / {ult.count('E')}E"
 
-# 🧩 Comparação posicional por linha (1×4, 2×5, 3×6)
+# Comparações posicionais
 def comparar_linhas_posicionais(h):
     linhas_validas = [r for r in h if r in ["C", "V", "E"]]
     if len(linhas_validas) < 54:
-        return ["Dados insuficientes"]
-    
-    def linha(n):
-        return linhas_validas[-(9 * n):-9 * (n - 1)]
-    
+        return ["Poucos dados para comparação"]
+    def linha(n): return linhas_validas[-(9 * n):-9 * (n - 1)]
     resultados = []
     for atual, espelho in [(1, 4), (2, 5), (3, 6)]:
-        l1 = linha(atual)
-        l2 = linha(espelho)
+        l1, l2 = linha(atual), linha(espelho)
         iguais = sum(1 for x, y in zip(l1, l2) if x == y or (x in "CV" and y in "CV"))
         resultados.append(f"Linha {atual} × {espelho}: {iguais}/9 semelhantes")
     return resultados
 
-# 🎯 Sugestão preditiva refinada
 def bolha_cor(r):
     return {
         "C": "🟥",
@@ -130,7 +124,7 @@ def sugestao(h):
     maior = max(contagens, key=contagens.get)
     return f"📊 Tendência favorece entrada em {bolha_cor(maior)} ({maior})"
 
-# 🧠 Interface
+# Interface
 st.set_page_config(page_title="Football Studio – Radar Estratégico", layout="wide")
 st.title("🎲 Football Studio Live — Leitura de Padrões")
 
@@ -148,17 +142,17 @@ st.subheader("🎯 Sugestão estratégica")
 st.success(sugestao(h))
 
 # Histórico visual
-st.subheader("🧾 Histórico visual (27 ativos + espectador)")
+st.subheader("🧾 Histórico visual (até 300 resultados)")
 h_reverso = h[::-1]
 bolhas = [bolha_cor(r) for r in h_reverso]
 for i in range(0, len(bolhas), 9):
     linha = bolhas[i:i + 9]
     estilo = 'font-size:24px;' if i < 27 else 'font-size:20px; opacity:0.5;'
-    st.markdown("".join(f"<span style='{estilo} margin-right:4px;'>{b}</span>" for b in linha),
+    st.markdown("".join(f"<span style='{estilo} margin-right:4px;'>{b}</span>"),
                 unsafe_allow_html=True)
 
-# Painel de análise
-st.subheader("📊 Análise preditiva (últimos 27)")
+# Painel preditivo
+st.subheader("📊 Análise dos últimos 27 válidos")
 valores = get_valores(h)
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Casa", valores.count("C"))
@@ -174,42 +168,35 @@ st.write(f"Blocos espelhados: **{blocos_espelhados(h)}**")
 st.write(f"Alternância por linha: **{alternancia_por_linha(h)}**")
 st.write(f"Tendência final: **{tendencia_final(h)}**")
 
-# 🔁 Comparação posicional
+# Comparações posicionais
 st.subheader("🧩 Semelhança por linha (1×4, 2×5, 3×6)")
-for resultado in comparar_linhas_posicionais(h):
-    st.write(resultado)
+for comp in comparar_linhas_posicionais(h):
+    st.write(comp)
 
-# Alertas estratégicos
-st.subheader("🚨 Alertas críticos")
-alertas = []
 # Alertas estratégicos
 st.subheader("🚨 Alertas críticos")
 alertas = []
 if sequencia_final(h) >= 5 and valores[-1] in ["C", "V"]:
-    alerta = f"🟥 Sequência final ativa de {bolha_cor(valores[-1])} — possível reversão"
-    alertas.append(alerta)
-
+    alertas.append(f"🟥 Sequência de {bolha_cor(valores[-1])} — possível inversão")
 if eco_visual(h) == "Detectado":
-    alertas.append("🔁 Eco visual identificado — padrão pode se repetir")
-
+    alertas.append("🔁 Eco visual identificado — possível repetição")
 if eco_parcial(h).startswith(("4", "5", "6")):
-    alertas.append("🧠 Eco parcial — padrão reescrito com semelhanças")
-
+    alertas.append("🧠 Eco parcial — padrão reescrito com semelhança")
 if dist_empates(h) == 1:
-    alertas.append("🟨 Empates consecutivos — momento instável")
-
+    alertas.append("🟨 Empates consecutivos — instabilidade")
 if blocos_espelhados(h) >= 1:
+    alert
+    if blocos_espelhados(h) >= 1:
     alertas.append("🧩 Bloco espelhado — comportamento reflexivo")
 
-comparacoes = comparar_linhas_posicionais(h)
-for c in comparacoes:
-    if "semelhantes" in c:
-        qtd = int(c.split(":")[1].split("/")[0])
+for comp in comparar_linhas_posicionais(h):
+    if "semelhantes" in comp and comp != "Poucos dados para comparação":
+        qtd = int(comp.split(":")[1].split("/")[0])
         if qtd >= 7:
-            alertas.append("🧬 Reescrita por linha detectada — padrão simulando continuidade visual")
+            alertas.append("🧬 Reescrita posicional detectada — padrão refletido por linha")
 
 if not alertas:
-    st.info("Nenhum padrão crítico identificado.")
+    st.info("✅ Nenhum padrão crítico identificado.")
 else:
     for alerta in alertas:
         st.warning(alerta)
@@ -218,5 +205,3 @@ else:
 if st.button("🧹 Limpar histórico"):
     st.session_state.historico = []
     st.rerun()
-
-if sequencia_final(h) >= 5 and valores
