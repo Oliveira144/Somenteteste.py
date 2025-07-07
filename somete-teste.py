@@ -1,21 +1,25 @@
 import streamlit as st
 
-# Histórico com limite geral
+# Histórico com limite automático de 100 entradas
 if "historico" not in st.session_state:
     st.session_state.historico = []
 
 def adicionar_resultado(valor):
+    if len(st.session_state.historico) >= 100:
+        st.session_state.historico.pop(0)
     st.session_state.historico.append(valor)
 
-# 🔍 Funções analíticas usando os últimos 27 válidos
+# 🔍 Funções analíticas com tratamento para dados insuficientes
 def get_valores(h):
     return [r for r in h if r in ["C", "V", "E"]][-27:]
 
 def maior_sequencia(h):
     h = get_valores(h)
+    if not h:
+        return 0
     max_seq = atual = 1
     for i in range(1, len(h)):
-        if h[i] == h[i - 1]:
+        if h[i] == h[i-1]:
             atual += 1
             max_seq = max(max_seq, atual)
         else:
@@ -28,7 +32,7 @@ def sequencia_final(h):
         return 0
     atual = h[-1]
     count = 1
-    for i in range(len(h) - 2, -1, -1):
+    for i in range(len(h)-2, -1, -1):
         if h[i] == atual:
             count += 1
         else:
@@ -37,7 +41,9 @@ def sequencia_final(h):
 
 def alternancia(h):
     h = get_valores(h)
-    return sum(1 for i in range(1, len(h)) if h[i] != h[i - 1])
+    if len(h) < 2:
+        return 0
+    return sum(1 for i in range(1, len(h)) if h[i] != h[i-1])
 
 def eco_visual_por_linha(h):
     h = get_valores(h)
@@ -53,7 +59,7 @@ def eco_parcial_por_linha(h):
         return "Poucos dados"
     ult = h[-9:]
     penult = h[-18:-9]
-    semelhantes = sum(1 for a, b in zip(penult, ult) if a == b or (a in ['C', 'V'] and b in ['C', 'V']))
+    semelhantes = sum(1 for a, b in zip(penult, ult) if a == b or (a in ['C','V'] and b in ['C','V']))
     return f"{semelhantes}/9 semelhantes"
 
 def dist_empates(h):
@@ -64,19 +70,21 @@ def dist_empates(h):
 def blocos_espelhados(h):
     h = get_valores(h)
     cont = 0
-    for i in range(len(h) - 5):
-        if h[i:i + 3] == h[i + 3:i + 6][::-1]:
+    for i in range(len(h)-5):
+        if h[i:i+3] == h[i+3:i+6][::-1]:
             cont += 1
     return cont
 
 def alternancia_por_linha(h):
     h = get_valores(h)
-    linhas = [h[i:i + 9] for i in range(0, len(h), 9)]
-    return [sum(1 for j in range(1, len(linha)) if linha[j] != linha[j - 1]) for linha in linhas]
+    linhas = [h[i:i+9] for i in range(0, len(h), 9) if len(h[i:i+9]) >= 2]
+    return [sum(1 for j in range(1, len(linha)) if linha[j] != linha[j-1]) for linha in linhas]
 
 def tendencia_final(h):
     h = get_valores(h)
-    ult = h[-9:]
+    if not h:
+        return "Sem dados"
+    ult = h[-9:] if len(h) >= 9 else h
     return f"{ult.count('C')}C / {ult.count('V')}V / {ult.count('E')}E"
 
 def bolha_cor(r):
@@ -130,15 +138,17 @@ st.success(sugestao(h))
 
 # Histórico visual com destaque até 3 linhas (27 bolhas)
 st.subheader("🧾 Histórico visual (zona ativa: 3 linhas)")
-h_reverso = h[::-1]
-bolhas_visuais = [bolha_cor(r) for r in h_reverso]
-for i in range(0, len(bolhas_visuais), 9):
-    linha = bolhas_visuais[i:i + 9]
-    estilo = 'font-size:24px;' if i < 27 else 'font-size:20px; opacity:0.5;'
-    bolha_html = "".join(
-        f"<span style='{estilo} margin-right:4px;'>{b}</span>" for b in linha
-    )
-    st.markdown(f"<div style='display:flex; gap:4px;'>{bolha_html}</div>", unsafe_allow_html=True)
+if h:
+    # Mostrar do mais recente para o mais antigo
+    for i in range(0, len(h), 9):
+        linha = h[::-1][i:i+9]  # Inverte para mostrar recentes primeiro
+        estilo = 'font-size:24px;' if i < 27 else 'font-size:20px; opacity:0.5;'
+        bolha_html = "".join(
+            f"<span style='{estilo} margin-right:4px;'>{bolha_cor(r)}</span>" for r in linha
+        )
+        st.markdown(f"<div style='display:flex;'>{bolha_html}</div>", unsafe_allow_html=True)
+else:
+    st.caption("Nenhum resultado registrado")
 
 # Painel de análise
 st.subheader("📊 Análise dos últimos 27 jogadas")
@@ -146,26 +156,36 @@ valores = get_valores(h)
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Casa", valores.count("C"))
 col2.metric("Total Visitante", valores.count("V"))
-col3.metric("Total Empates", valores.count("E"))
+col3.metric("Total Empates", valores.count("E") if valores else 0)
 
 st.write(f"Maior sequência: **{maior_sequencia(h)}**")
+st.write(f"Sequência atual: **{sequencia_final(h)}**")
 st.write(f"Alternância total: **{alternancia(h)}**")
 st.write(f"Eco visual por linha: **{eco_visual_por_linha(h)}**")
 st.write(f"Eco parcial por linha: **{eco_parcial_por_linha(h)}**")
 st.write(f"Distância entre empates: **{dist_empates(h)}**")
 st.write(f"Blocos espelhados: **{blocos_espelhados(h)}**")
-st.write(f"Alternância por linha: **{alternancia_por_linha(h)}**")
+
+# Alternância por linha formatada
+alt_por_linha = alternancia_por_linha(h)
+if alt_por_linha:
+    st.write("Alternância por linha:")
+    for i, val in enumerate(alt_por_linha[-3:]):  # Mostra apenas últimas 3 linhas
+        st.caption(f"• Linha {len(alt_por_linha)-i}: {val} alterações")
+else:
+    st.write("Alternância por linha: Dados insuficientes")
+
 st.write(f"Tendência final: **{tendencia_final(h)}**")
 
 # Alertas
 st.subheader("🚨 Alerta estratégico")
 alertas = []
-if sequencia_final(h) >= 5 and valores[-1] in ["C", "V"]:
-    alertas.append("🟥 Sequência final ativa — possível inversão")
+if sequencia_final(h) >= 5 and valores and valores[-1] in ["C", "V"]:
+    alertas.append(f"🟥 Sequência de {sequencia_final(h)} — possível inversão")
 if eco_visual_por_linha(h) == "Detectado":
-    alertas.append("🔁 Eco visual por linha detectado — possível repetição")
+    alertas.append("🔁 Eco visual detectado — possível repetição")
 if eco_parcial_por_linha(h).startswith(("6", "7", "8", "9")):
-    alertas.append("🧠 Eco parcial por linha — padrão reescrito com semelhança")
+    alertas.append("🧠 Eco parcial — padrão reescrito")
 if dist_empates(h) == 1:
     alertas.append("🟨 Empates consecutivos — instabilidade")
 if blocos_espelhados(h) >= 1:
