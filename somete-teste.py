@@ -1,278 +1,222 @@
 import streamlit as st
-import collections
 
-# --- Definições Globais ---
-SIMBOLOS_EXIBICAO = {
-    'C': 'C (Casa/Azul)',
-    'V': 'V (Visitante/Vermelho)',
-    'E_C': 'E (Empate, prox. Casa/Azul)',
-    'E_V': 'E (Empate, prox. Visitante/Vermelho)'
-}
+# 🚀 Histórico expandido
+if "historico" not in st.session_state:
+    st.session_state.historico = []
 
-# Definições das dimensões da Road (MOVIDAS PARA CÁ PARA RESOLVER O ERRO)
-NUM_LINHAS_ROAD = 3
-NUM_COLUNAS_ROAD = 9
+def adicionar_resultado(valor):
+    st.session_state.historico.append(valor)
+    if len(st.session_state.historico) > 300:
+        st.session_state.historico.pop(0)
 
-# Tamanho da janela de análise que você observa (equivalente ao 3x9 = 27 células)
-TAMANHO_JANELA_ANALISE = NUM_LINHAS_ROAD * NUM_COLUNAS_ROAD
-# Quantidade de resultados que você considera como "última linha" para sua análise
-TAMANHO_LINHA_OBSERVACAO = NUM_COLUNAS_ROAD # Assumindo 9 resultados por "linha" visual
+# 🔍 Zona ativa: últimos 27 válidos (3 linhas)
+def get_valores(h):
+    return [r for r in h if r in ["C", "V", "E"]][-27:]
 
-# --- Inicialização do Session State (CRUCIAL para Streamlit) ---
-# O st.session_state é usado para persistir dados entre as interações do usuário no Streamlit
-if 'historico_completo' not in st.session_state:
-    st.session_state.historico_completo = collections.deque(maxlen=1000) # Capacidade maior
-if 'tabela_road_interna' not in st.session_state:
-    # Garante que a tabela interna seja inicializada corretamente com as dimensões
-    st.session_state.tabela_road_interna = [['' for _ in range(NUM_COLUNAS_ROAD)] for _ in range(NUM_LINHAS_ROAD)]
-
-# --- Funções Auxiliares ---
-
-def formatar_resultado_para_exibicao(res):
-    """Formata o resultado para exibição amigável."""
-    if isinstance(res, tuple):
-        return SIMBOLOS_EXIBICAO[f'E_{res[1]}']
-    # Caso um resultado vazio ('' ) seja passado antes do histórico encher
-    if res == '':
-        return ''
-    return SIMBOLOS_EXIBICAO[res]
-
-def obter_cor_resultado(res):
-    """Retorna a cor associada ao resultado ('Azul' ou 'Vermelho').
-       Para empates, retorna a cor da 'linha' (próximo vencedor).
-       Retorna None se o resultado for vazio."""
-    if res == '':
-        return None
-    if isinstance(res, tuple): # Empate
-        return 'Azul' if res[1] == 'C' else 'Vermelho'
-    return 'Azul' if res == 'C' else 'Vermelho'
-
-def get_vencedor_real(res):
-    """Retorna 'C' ou 'V' para o resultado, tratando empates pelo próximo vencedor."""
-    if isinstance(res, tuple): # Empate
-        return res[1] # Retorna 'C' ou 'V' que o seguiu
-    return res # Retorna 'C' ou 'V' diretamente
-
-def adicionar_resultado_ao_historico_e_road(resultado):
-    """
-    Adiciona um novo resultado ao histórico completo e atualiza a tabela interna do road.
-    Este é o ponto de entrada para novos resultados.
-    """
-    # Adiciona ao histórico principal do session_state
-    st.session_state.historico_completo.append(resultado)
-    
-    # Atualiza a tabela_road_interna simulando o movimento do road
-    # Move todas as células da tabela_road_interna uma posição para a esquerda
-    # Isso simula o comportamento de "rolar" a tela para a esquerda quando um novo resultado entra
-    for r in range(NUM_LINHAS_ROAD):
-        for c in range(NUM_COLUNAS_ROAD - 1):
-            st.session_state.tabela_road_interna[r][c] = st.session_state.tabela_road_interna[r][c+1]
-        st.session_state.tabela_road_interna[r][NUM_COLUNAS_ROAD - 1] = '' # Limpa a última coluna
-
-    # Adiciona o novo resultado na primeira linha da última coluna
-    # Esta é a lógica simplificada para simular a entrada do novo resultado na visualização que você viu
-    st.session_state.tabela_road_interna[0][NUM_COLUNAS_ROAD - 1] = resultado
-    
-    st.success(f"Resultado '{formatar_resultado_para_exibicao(resultado)}' adicionado ao histórico.")
-
-
-# --- Funções de Análise de Padrões ---
-
-def analisar_padroes_football_studio():
-    """
-    Função principal para analisar os padrões do Football Studio com base na sua hipótese.
-    """
-    n = len(st.session_state.historico_completo)
-    
-    st.subheader("Análise de Padrões")
-
-    if n < TAMANHO_JANELA_ANALISE: # 27 resultados para preencher a road completa
-        st.warning(f"Histórico muito pequeno ({n} resultados). Precisa de pelo menos {TAMANHO_JANELA_ANALISE} para uma análise completa da 'road'.")
-        st.info("Continue inserindo resultados para preencher a tabela de visualização interna.")
-        return
-
-    # Extrai a janela de análise mais recente (os últimos 27 resultados)
-    # Convertemos para lista para poder fatiar, pois deque não suporta fatiamento direto de todos os elementos
-    janela_analise = list(st.session_state.historico_completo)[-TAMANHO_JANELA_ANALISE:]
-
-    # 1. Análise da "cor que some" vs. "cor que aparece"
-    st.markdown("---")
-    st.markdown("**1. Análise da 'Cor que Some' vs. 'Cor que Aparece':**")
-    
-    # O resultado que "sumiu" da visualização é o elemento que estava na posição inicial do histórico
-    # antes dos 27 resultados mais recentes (se o histórico já tiver pelo menos 27 resultados).
-    # Se o histórico for exatamente 27, é o primeiro elemento.
-    
-    # Esta lógica assume que a janela de análise é o que está "visível" no road.
-    # Quando um novo resultado é adicionado, o mais antigo da janela (o primeiro) "some".
-    # O resultado que "apareceu" é o mais recente.
-    
-    cor_que_sumiu_da_visualizacao = obter_cor_resultado(janela_analise[0]) # Primeiro elemento da janela
-    cor_que_apareceu_agora = obter_cor_resultado(janela_analise[-1]) # Último elemento da janela (o mais recente)
-
-    st.markdown(f"**Cor que 'sumiu' da visualização (mais antigo da janela):** {cor_que_sumiu_da_visualizacao}")
-    st.markdown(f"**Cor que 'apareceu' (resultado mais recente na janela):** {cor_que_apareceu_agora}")
-
-    if cor_que_sumiu_da_visualizacao == cor_que_apareceu_agora:
-        st.success(f"**PADRÃO DETECTADO:** A cor ({cor_que_apareceu_agora}) que 'sumiu' do início da visualização é a mesma do resultado mais recente. (Sua Regra de Cores)")
-    else:
-        st.info(f"**OBS:** A cor que 'sumiu' ({cor_que_sumiu_da_visualizacao}) é diferente da cor que 'apareceu' ({cor_que_apareceu_agora}).")
-
-    # 2. Análise de Sequências na "Última Linha" (os 9 resultados mais recentes)
-    st.markdown("---")
-    st.markdown("**2. Análise de Sequências na 'Última Linha' (últimos 9 resultados):**")
-    
-    # Pega os últimos 9 resultados do histórico completo, que representam a "última linha" visual.
-    ultimos_9_resultados = list(st.session_state.historico_completo)[-TAMANHO_LINHA_OBSERVACAO:]
-    
-    sequencias_detectadas = []
-    contagem_sequencia = 0
-    cor_atual_sequencia = None
-    
-    if len(ultimos_9_resultados) >= 3:
-        for i in range(len(ultimos_9_resultados)):
-            current_res_color = obter_cor_resultado(ultimos_9_resultados[i])
-            
-            if current_res_color is None: # Ignora células vazias se houver (não deve acontecer com histórico cheio)
-                continue
-
-            if current_res_color == cor_atual_sequencia:
-                contagem_sequencia += 1
-            else:
-                if contagem_sequencia >= 3:
-                    sequencias_detectadas.append(f"{contagem_sequencia}x {cor_atual_sequencia} seguida.")
-                cor_atual_sequencia = current_res_color
-                contagem_sequencia = 1
-        
-        if contagem_sequencia >= 3: # Checa a última sequência após o loop
-            sequencias_detectadas.append(f"{contagem_sequencia}x {cor_atual_sequencia} seguida.")
-
-    if sequencias_detectadas:
-        for seq in sequencias_detectadas:
-            st.success(f"- {seq}")
-        
-        # Inferência de "virando", "alternando", "seguindo"
-        # Para isso, olhamos para o resultado imediatamente posterior à "última linha" (se houver)
-        # Que seria o resultado mais recente no histórico completo
-        if len(st.session_state.historico_completo) > TAMANHO_LINHA_OBSERVACAO:
-            ultima_sequencia_cor = sequencias_detectadas[-1].split('x ')[1].split(' ')[0] # Extrai a cor
-            cor_do_proximo_resultado_apos_sequencia = obter_cor_resultado(st.session_state.historico_completo[-1])
-            
-            if cor_do_proximo_resultado_apos_sequencia == ultima_sequencia_cor:
-                st.info(f"   **Inferência:** Após a última sequência de {ultima_sequencia_cor}, a cor parece estar 'seguindo'.")
-            else:
-                st.info(f"   **Inferência:** Após a última sequência de {ultima_sequencia_cor}, a cor parece estar 'virando' para {cor_do_proximo_resultado_apos_sequencia}.")
-            # A lógica para "alternando" seria mais complexa, exigiria analisar 2 ou 3 resultados futuros da sequência.
-            # Se você tiver uma regra específica para "alternando", me diga.
-    else:
-        st.info("Nenhuma sequência de 3 ou mais cores seguidas detectada na 'Última Linha' (últimos 9 resultados).")
-
-    # 3. Análise de Comportamento dos Empates ("E")
-    st.markdown("---")
-    st.markdown("**3. Análise de Comportamento dos Empates (E):**")
-    
-    empates_na_janela = []
-    # Coleta empates da janela de análise de 27 resultados
-    for i, res in enumerate(janela_analise):
-        if isinstance(res, tuple) and res[0] == 'E':
-            empates_na_janela.append((i, res)) # (indice_na_janela, resultado_empate)
-
-    if not empates_na_janela:
-        st.info("Nenhum empate na janela de análise atual.")
-    else:
-        st.markdown(f"Empates encontrados na janela de análise ({len(empates_na_janela)}):")
-        for idx, empate_res in empates_na_janela:
-            cor_seguinte_empate = obter_cor_resultado(empate_res)
-            st.text(f"  - Posição relativa na janela {idx} (0=mais antigo): Empate seguido de {cor_seguinte_empate} ({formatar_resultado_para_exibicao(empate_res)})")
-
-        if len(empates_na_janela) >= 2:
-            ultimo_empate_cor = obter_cor_resultado(empates_na_janela[-1][1])
-            penultimo_empate_cor = obter_cor_resultado(empates_na_janela[-2][1])
-            
-            if ultimo_empate_cor == penultimo_empate_cor:
-                st.success(f"**PADRÃO:** Dois últimos empates seguidos de mesma cor ({ultimo_empate_cor}).")
-            else:
-                st.info(f"**OBS:** Dois últimos empates seguidos de cores alternadas ({penultimo_empate_cor} -> {ultimo_empate_cor}).")
-
-        # Regra específica "os 2 que estão colados viraram azul e os 2 vermelho viraram azul e o outro azul"
-        # Esta é uma regra que você precisa formalizar com mais exemplos ou uma sequência exata.
-        # Por exemplo, se significa uma sequência específica de (E_V, E_V, E_C, E_C, E_C) ou similar,
-        # poderíamos buscar essa sub-sequência na 'janela_analise'.
-        st.markdown("\n_Para a regra complexa de empates ('os 2 que estão colados viraram azul...'), por favor, forneça a sequência exata de resultados (E C/E V) que a caracteriza e a previsão associada._")
-        
-    st.markdown("---")
-
-
-# --- Interface Streamlit Principal ---
-
-st.set_page_config(layout="wide", page_title="Analisador de Padrões Football Studio")
-
-st.title("⚽ Analisador de Padrões Football Studio")
-st.markdown("Insira os resultados e veja a análise baseada nas suas observações.")
-
-# Colunas para entrada de dados
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Inserir Novo Resultado")
-    entrada_usuario = st.text_input(
-        "Digite o próximo resultado:",
-        placeholder="Ex: C, V, E C, E V",
-        key="input_resultado" # Adicionado key para gerenciar o estado do input
-    )
-
-    if st.button("Adicionar Resultado", key="btn_add_resultado"):
-        if entrada_usuario:
-            entrada_formatada = entrada_usuario.strip().upper()
-            if entrada_formatada in ['C', 'V']:
-                adicionar_resultado_ao_historico_e_road(entrada_formatada)
-            elif entrada_formatada.startswith('E '):
-                partes = entrada_formatada.split()
-                if len(partes) == 2 and partes[0] == 'E' and partes[1] in ['C', 'V']:
-                    adicionar_resultado_ao_historico_e_road(('E', partes[1]))
-                else:
-                    st.error("Entrada inválida para Empate. Use 'E C' ou 'E V'.")
-            else:
-                st.error("Entrada inválida. Use 'C', 'V', 'E C' ou 'E V'.")
-            
-            # Limpa o campo de entrada após adicionar o resultado
-            st.session_state.input_resultado = ""
-            st.rerun() # Força uma nova execução para atualizar a interface
+# 🎯 Funções preditivas com zona ativa
+def maior_sequencia(h):
+    h = get_valores(h)
+    max_seq = atual = 1
+    for i in range(1, len(h)):
+        if h[i] == h[i - 1]:
+            atual += 1
+            max_seq = max(max_seq, atual)
         else:
-            st.warning("Por favor, digite um resultado.")
+            atual = 1
+    return max_seq
 
-with col2:
-    st.subheader("Ações")
-    if st.button("Analisar Padrões", key="btn_analisar"):
-        analisar_padroes_football_studio()
-
-    if st.button("Mostrar Histórico Completo", key="btn_mostrar_historico"):
-        if st.session_state.historico_completo:
-            st.write("### Histórico Completo de Resultados:")
-            historico_formatado = [formatar_resultado_para_exibicao(res) for res in st.session_state.historico_completo]
-            # Exibe em colunas para melhor visualização se for muito longo
-            st.write(" ".join(historico_formatado)) # Simplesmente junta tudo para visualização
-            # Ou para uma exibição mais estruturada:
-            # st.code(historico_formatado) # Exibe como código
+def sequencia_final(h):
+    h = get_valores(h)
+    if not h:
+        return 0
+    atual = h[-1]
+    count = 1
+    for i in range(len(h) - 2, -1, -1):
+        if h[i] == atual:
+            count += 1
         else:
-            st.info("Histórico vazio. Adicione alguns resultados primeiro.")
+            break
+    return count
+
+def alternancia(h):
+    h = get_valores(h)
+    return sum(1 for i in range(1, len(h)) if h[i] != h[i - 1])
+
+def eco_visual(h):
+    h = get_valores(h)
+    if len(h) < 12:
+        return "Poucos dados"
+    return "Detectado" if h[-6:] == h[-12:-6] else "Não houve"
+
+def eco_parcial(h):
+    h = get_valores(h)
+    if len(h) < 12:
+        return "Poucos dados"
+    anterior = h[-12:-6]
+    atual = h[-6:]
+    semelhantes = sum(1 for a, b in zip(anterior, atual) if a == b or (a in "CV" and b in "CV"))
+    return f"{semelhantes}/6 semelhantes"
+
+def dist_empates(h):
+    h = get_valores(h)
+    empates = [i for i, r in enumerate(h) if r == 'E']
+    return empates[-1] - empates[-2] if len(empates) >= 2 else "N/A"
+
+def blocos_espelhados(h):
+    h = get_valores(h)
+    cont = 0
+    for i in range(len(h) - 5):
+        if h[i:i + 3] == h[i + 3:i + 6][::-1]:
+            cont += 1
+    return cont
+
+def alternancia_por_linha(h):
+    h = get_valores(h)
+    linhas = [h[i:i + 9] for i in range(0, len(h), 9)]
+    return [sum(1 for j in range(1, len(linha)) if linha[j] != linha[j - 1]) for linha in linhas]
+
+def tendencia_final(h):
+    h = get_valores(h)
+    ult = h[-5:]
+    return f"{ult.count('C')}C / {ult.count('V')}V / {ult.count('E')}E"
+
+# 🧩 Comparação posicional por linha (1×4, 2×5, 3×6)
+def comparar_linhas_posicionais(h):
+    linhas_validas = [r for r in h if r in ["C", "V", "E"]]
+    if len(linhas_validas) < 54:
+        return ["Dados insuficientes"]
     
-    if st.button("Limpar Histórico", key="btn_limpar_historico"):
-        st.session_state.historico_completo = collections.deque(maxlen=1000)
-        st.session_state.tabela_road_interna = [['' for _ in range(NUM_COLUNAS_ROAD)] for _ in range(NUM_LINHAS_ROAD)]
-        st.success("Histórico e tabela interna limpos.")
-        st.rerun() # Reinicia o app para refletir a limpeza
+    def linha(n):
+        return linhas_validas[-(9 * n):-9 * (n - 1)]
+    
+    resultados = []
+    for atual, espelho in [(1, 4), (2, 5), (3, 6)]:
+        l1 = linha(atual)
+        l2 = linha(espelho)
+        iguais = sum(1 for x, y in zip(l1, l2) if x == y or (x in "CV" and y in "CV"))
+        resultados.append(f"Linha {atual} × {espelho}: {iguais}/9 semelhantes")
+    return resultados
 
+# 🎯 Sugestão preditiva refinada
+def bolha_cor(r):
+    return {
+        "C": "🟥",
+        "V": "🟦",
+        "E": "🟨",
+        "🔽": "⬇️"
+    }.get(r, "⬜")
 
-# Exibir o estado atual do histórico na sidebar
-st.sidebar.subheader(f"Total de Resultados no Histórico: {len(st.session_state.historico_completo)}")
-if len(st.session_state.historico_completo) > 0:
-    st.sidebar.markdown("Últimos resultados adicionados:")
-    # Mostrar apenas os últimos 10 para não lotar a sidebar
-    for res in list(st.session_state.historico_completo)[-10:]:
-        st.sidebar.text(formatar_resultado_para_exibicao(res))
+def sugestao(h):
+    valores = get_valores(h)
+    if not valores:
+        return "Insira resultados para gerar previsão."
+    ult = valores[-1]
+    seq = sequencia_final(h)
+    eco = eco_visual(h)
+    parcial = eco_parcial(h)
+    contagens = {
+        "C": valores.count("C"),
+        "V": valores.count("V"),
+        "E": valores.count("E")
+    }
 
-# Opcional: Exibir a tabela road interna (apenas para debug/visualização da lógica)
-# st.markdown("### Visualização Interna do Road (para debug):")
-# for linha in st.session_state.tabela_road_interna:
-#    st.text(" ".join([formatar_resultado_para_exibicao(celula).ljust(15) for celula in linha]))
+    if seq >= 5 and ult in ["C", "V"]:
+        cor_inversa = "V" if ult == "C" else "C"
+        return f"🔁 Sequência atual de {bolha_cor(ult)} — possível reversão para {bolha_cor(cor_inversa)}"
+    if ult == "E":
+        return "🟨 Empate recente — instável, possível 🟥 ou 🟦"
+    if eco == "Detectado" or parcial.startswith(("5", "6")):
+        return f"🔄 Reescrita visual — repetir padrão com {bolha_cor(ult)}"
+    maior = max(contagens, key=contagens.get)
+    return f"📊 Tendência favorece entrada em {bolha_cor(maior)} ({maior})"
+
+# 🧠 Interface
+st.set_page_config(page_title="Football Studio – Radar Estratégico", layout="wide")
+st.title("🎲 Football Studio Live — Leitura de Padrões")
+
+# Entrada manual
+col1, col2, col3, col4 = st.columns(4)
+if col1.button("➕ Casa (C)"): adicionar_resultado("C")
+if col2.button("➕ Visitante (V)"): adicionar_resultado("V")
+if col3.button("➕ Empate (E)"): adicionar_resultado("E")
+if col4.button("🗂️ Novo baralho"): adicionar_resultado("🔽")
+
+h = st.session_state.historico
+
+# Sugestão principal
+st.subheader("🎯 Sugestão estratégica")
+st.success(sugestao(h))
+
+# Histórico visual
+st.subheader("🧾 Histórico visual (27 ativos + espectador)")
+h_reverso = h[::-1]
+bolhas = [bolha_cor(r) for r in h_reverso]
+for i in range(0, len(bolhas), 9):
+    linha = bolhas[i:i + 9]
+    estilo = 'font-size:24px;' if i < 27 else 'font-size:20px; opacity:0.5;'
+    st.markdown("".join(f"<span style='{estilo} margin-right:4px;'>{b}</span>" for b in linha),
+                unsafe_allow_html=True)
+
+# Painel de análise
+st.subheader("📊 Análise preditiva (últimos 27)")
+valores = get_valores(h)
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Casa", valores.count("C"))
+col2.metric("Total Visitante", valores.count("V"))
+col3.metric("Total Empates", valores.count("E"))
+
+st.write(f"Maior sequência: **{maior_sequencia(h)}**")
+st.write(f"Alternância: **{alternancia(h)}**")
+st.write(f"Eco visual: **{eco_visual(h)}**")
+st.write(f"Eco parcial: **{eco_parcial(h)}**")
+st.write(f"Distância entre empates: **{dist_empates(h)}**")
+st.write(f"Blocos espelhados: **{blocos_espelhados(h)}**")
+st.write(f"Alternância por linha: **{alternancia_por_linha(h)}**")
+st.write(f"Tendência final: **{tendencia_final(h)}**")
+
+# 🔁 Comparação posicional
+st.subheader("🧩 Semelhança por linha (1×4, 2×5, 3×6)")
+for resultado in comparar_linhas_posicionais(h):
+    st.write(resultado)
+
+# Alertas estratégicos
+st.subheader("🚨 Alertas críticos")
+alertas = []
+# Alertas estratégicos
+st.subheader("🚨 Alertas críticos")
+alertas = []
+if sequencia_final(h) >= 5 and valores[-1] in ["C", "V"]:
+    alerta = f"🟥 Sequência final ativa de {bolha_cor(valores[-1])} — possível reversão"
+    alertas.append(alerta)
+
+if eco_visual(h) == "Detectado":
+    alertas.append("🔁 Eco visual identificado — padrão pode se repetir")
+
+if eco_parcial(h).startswith(("4", "5", "6")):
+    alertas.append("🧠 Eco parcial — padrão reescrito com semelhanças")
+
+if dist_empates(h) == 1:
+    alertas.append("🟨 Empates consecutivos — momento instável")
+
+if blocos_espelhados(h) >= 1:
+    alertas.append("🧩 Bloco espelhado — comportamento reflexivo")
+
+comparacoes = comparar_linhas_posicionais(h)
+for c in comparacoes:
+    if "semelhantes" in c:
+        qtd = int(c.split(":")[1].split("/")[0])
+        if qtd >= 7:
+            alertas.append("🧬 Reescrita por linha detectada — padrão simulando continuidade visual")
+
+if not alertas:
+    st.info("Nenhum padrão crítico identificado.")
+else:
+    for alerta in alertas:
+        st.warning(alerta)
+
+# Botão de limpeza
+if st.button("🧹 Limpar histórico"):
+    st.session_state.historico = []
+    st.rerun()
+
+if sequencia_final(h) >= 5 and valores
