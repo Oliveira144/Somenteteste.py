@@ -48,6 +48,7 @@ def load_css():
         display: flex;
         justify-content: center;
         align-items: center;
+        min-height: 50px;
     }
     .grid-item-recente {
         box-shadow: 0 0 0 3px #ff4b4b;
@@ -157,7 +158,7 @@ def eco_parcial_por_linha(h):
     ult = h[-9:]
     penult = h[-18:-9]
     semelhantes = sum(1 for a, b in zip(penult, ult) 
-                   if a == b or (a in ['C','V'] and b in ['C','V']))
+                   if a == b or (a in ['C','V'] and b in ['C','V'])
     return f"{semelhantes}/9 semelhantes"
 
 def dist_empates(h):
@@ -255,30 +256,34 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Histórico visual em grid 3x9
+# Histórico visual em grid 3x9 - CORREÇÃO COMPLETA
 st.subheader("🧾 Histórico Visual (Zona Ativa: 3 Linhas)")
 valores_para_grid = get_valores(h)[-27:]  # Últimos 27 valores válidos
 
 # Preencher com espaços vazios se necessário
 while len(valores_para_grid) < 27:
-    valores_para_grid.insert(0, " ")
+    valores_para_grid.insert(0, " ")  # Preencher no início para manter a ordem
 
-# Dividir em 3 linhas de 9 colunas
-linhas = [valores_para_grid[i:i+9] for i in range(0, 27, 9)]
+# Dividir em 3 linhas de 9 colunas (Linha 1 = mais antiga, Linha 3 = mais recente)
+linhas = [
+    valores_para_grid[0:9],   # Linha 1 (mais antiga)
+    valores_para_grid[9:18],   # Linha 2
+    valores_para_grid[18:27]   # Linha 3 (mais recente)
+]
 
-# Mostrar as 3 linhas mais recentes
-for i in range(1, 4):
-    linha_idx = 3 - i  # Começa da linha mais recente
-    if linha_idx < len(linhas):
-        linha = linhas[linha_idx]
-        st.markdown(f"<div class='linha-label'>Linha {i}</div>", unsafe_allow_html=True)
-        st.markdown("<div class='grid-container'>", unsafe_allow_html=True)
-        for j, valor in enumerate(linha):
-            # Destacar o último item da última linha
-            destaque = (linha_idx == len(linhas)-1 and j == len(linha)-1) and valor != " "
-            classe = "grid-item grid-item-recente" if destaque else "grid-item"
-            st.markdown(f"<div class='{classe}'>{bolha_cor(valor)}</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+# Exibir as 3 linhas
+for i, linha in enumerate(linhas):
+    linha_num = i + 1
+    st.markdown(f"<div class='linha-label'>Linha {linha_num}</div>", unsafe_allow_html=True)
+    st.markdown("<div class='grid-container'>", unsafe_allow_html=True)
+    
+    for j, valor in enumerate(linha):
+        # Destacar o último item da última linha
+        destaque = (i == 2 and j == 8) and valor != " "
+        classe = "grid-item grid-item-recente" if destaque else "grid-item"
+        st.markdown(f"<div class='{classe}'>{bolha_cor(valor)}</div>", unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Painel de análise
 st.subheader("📊 Análise dos Últimos 27 Jogadas")
