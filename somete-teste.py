@@ -151,6 +151,7 @@ def eco_visual_por_linha(h):
     penult = h[-18:-9]
     return "Detectado" if ult == penult else "Não houve"
 
+# CORREÇÃO APLICADA AQUI - SINTAXE CORRIGIDA
 def eco_parcial_por_linha(h):
     h = get_valores(h)
     if len(h) < 18:
@@ -158,7 +159,7 @@ def eco_parcial_por_linha(h):
     ult = h[-9:]
     penult = h[-18:-9]
     semelhantes = sum(1 for a, b in zip(penult, ult) 
-                   if a == b or (a in ['C','V'] and b in ['C','V'])
+                   if a == b or (a in ['C','V'] and b in ['C','V']) else 0
     return f"{semelhantes}/9 semelhantes"
 
 def dist_empates(h):
@@ -213,7 +214,7 @@ def sugestao(h):
         return f"🔁 Sequência atual de {bolha_cor(ult)} — possível reversão para {bolha_cor(cor_inversa)}"
     if ult == "E":
         return "🟨 Empate recente — instável, possível 🟥 ou 🟦"
-    if eco == "Detectado" or parcial.startswith(("6", "7", "8", "9")):
+    if eco == "Detectado" or (isinstance(parcial, str) and parcial.startswith(("6", "7", "8", "9"))):
         return f"🔄 Reescrita visual — repetir padrão com {bolha_cor(ult)}"
     maior = max(contagens, key=contagens.get)
     return f"📊 Tendência favorece entrada em {bolha_cor(maior)} ({maior})"
@@ -345,7 +346,7 @@ if sequencia_final(h) >= 5 and valores and valores[-1] in ["C", "V"]:
     alertas.append("🟥 Sequência de {} - possível inversão".format(sequencia_final(h)))
 if eco_visual_por_linha(h) == "Detectado":
     alertas.append("🔁 Eco visual detectado - possível repetição")
-if eco_parcial_por_linha(h).startswith(("6", "7", "8", "9")):
+if isinstance(eco_parcial_por_linha(h), str) and eco_parcial_por_linha(h).startswith(("6", "7", "8", "9")):
     alertas.append("🧠 Eco parcial - padrão reescrito")
 if dist_empates(h) == 1:
     alertas.append("🟨 Empates consecutivos - instabilidade")
