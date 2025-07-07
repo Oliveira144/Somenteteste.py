@@ -1,49 +1,38 @@
 import streamlit as st
-import base64
 
 # Configuração de estilo CSS
 def load_css():
     css = """
     <style>
+    /* Estilos para os botões */
+    .stButton>button {
+        border-radius: 10px;
+        font-weight: bold;
+        padding: 10px 24px;
+        width: 100%;
+    }
     .btn-casa {
         background-color: #ff4b4b !important;
         color: white !important;
         border: 2px solid #cc0000 !important;
-        border-radius: 10px !important;
-        padding: 10px 24px !important;
-        font-weight: bold !important;
     }
     .btn-visitante {
         background-color: #1e90ff !important;
         color: white !important;
         border: 2px solid #0066cc !important;
-        border-radius: 10px !important;
-        padding: 10px 24px !important;
-        font-weight: bold !important;
     }
     .btn-empate {
         background-color: #ffdd00 !important;
         color: #333 !important;
         border: 2px solid #ccaa00 !important;
-        border-radius: 10px !important;
-        padding: 10px 24px !important;
-        font-weight: bold !important;
     }
     .btn-baralho {
         background-color: #4CAF50 !important;
         color: white !important;
         border: 2px solid #2E7D32 !important;
-        border-radius: 10px !important;
-        padding: 10px 24px !important;
-        font-weight: bold !important;
     }
-    .sugestao-box {
-        background-color: #e8f5e9;
-        border-radius: 10px;
-        padding: 20px;
-        margin: 15px 0;
-        border-left: 5px solid #4CAF50;
-    }
+    
+    /* Estilos para o grid de histórico */
     .grid-container {
         display: grid;
         grid-template-columns: repeat(9, 1fr);
@@ -56,10 +45,15 @@ def load_css():
         padding: 10px;
         border-radius: 8px;
         background-color: #f0f2f6;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
     .grid-item-recente {
         box-shadow: 0 0 0 3px #ff4b4b;
     }
+    
+    /* Estilos para os cards de análise */
     .metric-card {
         background-color: #f9f9f9;
         border-radius: 10px;
@@ -67,6 +61,8 @@ def load_css():
         margin-bottom: 15px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+    
+    /* Estilos para alertas */
     .alerta-box {
         border-radius: 10px;
         padding: 15px;
@@ -74,10 +70,25 @@ def load_css():
         background-color: #fff8e1;
         border-left: 5px solid #ffc107;
     }
+    
+    /* Estilos para sugestão */
+    .sugestao-box {
+        background-color: #e8f5e9;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 15px 0;
+        border-left: 5px solid #4CAF50;
+    }
+    
+    /* Melhorias gerais */
     .header-title {
         display: flex;
         justify-content: space-between;
         align-items: center;
+    }
+    .linha-label {
+        font-weight: bold;
+        margin-bottom: 5px;
     }
     </style>
     """
@@ -145,7 +156,6 @@ def eco_parcial_por_linha(h):
         return "Poucos dados"
     ult = h[-9:]
     penult = h[-18:-9]
-    # CORREÇÃO APLICADA AQUI
     semelhantes = sum(1 for a, b in zip(penult, ult) 
                    if a == b or (a in ['C','V'] and b in ['C','V']))
     return f"{semelhantes}/9 semelhantes"
@@ -222,28 +232,31 @@ with col_clear:
 
 # Botões de ação
 col1, col2, col3, col4 = st.columns(4)
-col1.button("🟥 Casa (C)", key="btn_casa", on_click=lambda: adicionar_resultado("C"), 
-           use_container_width=True, help="Registrar vitória da Casa")
-col2.button("🟦 Visitante (V)", key="btn_visitante", on_click=lambda: adicionar_resultado("V"), 
-           use_container_width=True, help="Registrar vitória do Visitante")
-col3.button("🟨 Empate (E)", key="btn_empate", on_click=lambda: adicionar_resultado("E"), 
-           use_container_width=True, help="Registrar empate")
-col4.button("🔄 Novo Baralho", key="btn_baralho", on_click=lambda: adicionar_resultado("🔽"), 
-           use_container_width=True, help="Iniciar novo baralho")
+with col1:
+    st.button("🟥 Casa (C)", key="btn_casa", on_click=lambda: adicionar_resultado("C"), 
+              use_container_width=True, help="Registrar vitória da Casa")
+with col2:
+    st.button("🟦 Visitante (V)", key="btn_visitante", on_click=lambda: adicionar_resultado("V"), 
+              use_container_width=True, help="Registrar vitória do Visitante")
+with col3:
+    st.button("🟨 Empate (E)", key="btn_empate", on_click=lambda: adicionar_resultado("E"), 
+              use_container_width=True, help="Registrar empate")
+with col4:
+    st.button("🔄 Novo Baralho", key="btn_baralho", on_click=lambda: adicionar_resultado("🔽"), 
+              use_container_width=True, help="Iniciar novo baralho")
 
 h = st.session_state.historico
 
 # Sugestão de entrada
 st.subheader("🎯 Sugestão de Entrada")
-with st.container():
-    st.markdown(f"""
-    <div class="sugestao-box">
-        <div style="font-size:20px; font-weight:bold;">{sugestao(h)}</div>
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown(f"""
+<div class="sugestao-box">
+    <div style="font-size:20px; font-weight:bold;">{sugestao(h)}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # Histórico visual em grid 3x9
-st.subheader("🧾 Histórico Visual (Últimas 27 Jogadas)")
+st.subheader("🧾 Histórico Visual (Zona Ativa: 3 Linhas)")
 valores_para_grid = get_valores(h)[-27:]  # Últimos 27 valores válidos
 
 # Preencher com espaços vazios se necessário
@@ -253,96 +266,70 @@ while len(valores_para_grid) < 27:
 # Dividir em 3 linhas de 9 colunas
 linhas = [valores_para_grid[i:i+9] for i in range(0, 27, 9)]
 
-# Mostrar do mais recente para o mais antigo
-for idx, linha in enumerate(reversed(linhas)):
-    st.markdown(f"<div class='grid-container'>", unsafe_allow_html=True)
-    for j, valor in enumerate(reversed(linha)):
-        # Destacar o último item
-        classe_extra = "grid-item-recente" if (idx == 0 and j == 0) and valor != " " else ""
-        st.markdown(f"<div class='grid-item {classe_extra}'>{bolha_cor(valor) if valor != ' ' else '⬜'}</div>", 
-                    unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+# Mostrar as 3 linhas mais recentes
+for i in range(1, 4):
+    linha_idx = 3 - i  # Começa da linha mais recente
+    if linha_idx < len(linhas):
+        linha = linhas[linha_idx]
+        st.markdown(f"<div class='linha-label'>Linha {i}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='grid-container'>", unsafe_allow_html=True)
+        for j, valor in enumerate(linha):
+            # Destacar o último item da última linha
+            destaque = (linha_idx == len(linhas)-1 and j == len(linha)-1) and valor != " "
+            classe = "grid-item grid-item-recente" if destaque else "grid-item"
+            st.markdown(f"<div class='{classe}'>{bolha_cor(valor)}</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # Painel de análise
-st.subheader("📊 Análise Estratégica")
-col_analise1, col_analise2 = st.columns(2)
+st.subheader("📊 Análise dos Últimos 27 Jogadas")
 
-with col_analise1:
+# Criar cards para os totais
+col1, col2, col3 = st.columns(3)
+with col1:
     st.markdown("""
     <div class="metric-card">
-        <h4>📈 Estatísticas Gerais</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>🟥 Casa:</div>
-            <div><b>{}</b></div>
-            <div>🟦 Visitante:</div>
-            <div><b>{}</b></div>
-            <div>🟨 Empates:</div>
-            <div><b>{}</b></div>
-            <div>🔀 Alternância:</div>
-            <div><b>{}</b></div>
-        </div>
+        <h4>🟥 Casa</h4>
+        <div style="font-size:24px; text-align:center; font-weight:bold;">{}</div>
     </div>
-    """.format(
-        get_valores(h).count("C"),
-        get_valores(h).count("V"),
-        get_valores(h).count("E"),
-        alternancia(h)
-    ), unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="metric-card">
-        <h4>🔄 Padrões de Repetição</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>🔍 Eco Visual:</div>
-            <div><b>{}</b></div>
-            <div>🔎 Eco Parcial:</div>
-            <div><b>{}</b></div>
-            <div>🧩 Blocos Espelhados:</div>
-            <div><b>{}</b></div>
-        </div>
-    </div>
-    """.format(
-        eco_visual_por_linha(h),
-        eco_parcial_por_linha(h),
-        blocos_espelhados(h)
-    ), unsafe_allow_html=True)
+    """.format(get_valores(h).count("C")), unsafe_allow_html=True)
 
-with col_analise2:
+with col2:
     st.markdown("""
     <div class="metric-card">
-        <h4>📉 Sequências Atuais</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>📏 Maior Sequência:</div>
-            <div><b>{}</b></div>
-            <div>⏱️ Sequência Atual:</div>
-            <div><b>{}</b></div>
-            <div>📅 Dist. Empates:</div>
-            <div><b>{}</b></div>
-            <div>📊 Última Linha:</div>
-            <div><b>{}</b></div>
-        </div>
+        <h4>🟦 Visitante</h4>
+        <div style="font-size:24px; text-align:center; font-weight:bold;">{}</div>
     </div>
-    """.format(
-        maior_sequencia(h),
-        sequencia_final(h),
-        dist_empates(h),
-        tendencia_final(h)
-    ), unsafe_allow_html=True)
-    
+    """.format(get_valores(h).count("V")), unsafe_allow_html=True)
+
+with col3:
     st.markdown("""
     <div class="metric-card">
-        <h4>📋 Alternância por Linha</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-    """, unsafe_allow_html=True)
-    
-    alt_por_linha = alternancia_por_linha(h)
-    if alt_por_linha:
-        for i, val in enumerate(alt_por_linha[-3:]):
-            st.markdown(f"<div>Linha {len(alt_por_linha)-i}:</div><div><b>{val} alter.</b></div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div>Dados insuficientes</div>", unsafe_allow_html=True)
-    
-    st.markdown("</div></div>", unsafe_allow_html=True)
+        <h4>🟨 Empates</h4>
+        <div style="font-size:24px; text-align:center; font-weight:bold;">{}</div>
+    </div>
+    """.format(get_valores(h).count("E")), unsafe_allow_html=True)
+
+# Outras métricas
+st.markdown("""
+<div class="metric-card">
+    <h4>📏 Maior Sequência</h4>
+    <div style="font-size:20px; text-align:center; font-weight:bold;">{}</div>
+</div>
+""".format(maior_sequencia(h)), unsafe_allow_html=True)
+
+st.markdown("""
+<div class="metric-card">
+    <h4>⏱️ Sequência Atual</h4>
+    <div style="font-size:20px; text-align:center; font-weight:bold;">{}</div>
+</div>
+""".format(sequencia_final(h)), unsafe_allow_html=True)
+
+st.markdown("""
+<div class="metric-card">
+    <h4>🔀 Alternância</h4>
+    <div style="font-size:20px; text-align:center; font-weight:bold;">{}</div>
+</div>
+""".format(alternancia(h)), unsafe_allow_html=True)
 
 # Alertas estratégicos
 st.subheader("🚨 Alertas Estratégicos")
