@@ -12,7 +12,6 @@ def adicionar_resultado(valor):
 def get_valores(h):
     return [r for r in h if r in ["C", "V", "E"]][-27:]
 
-# Funções preditivas
 def maior_sequencia(h):
     h = get_valores(h)
     max_seq = atual = 1
@@ -79,7 +78,6 @@ def tendencia_final(h):
     ult = h[-5:]
     return f"{ult.count('C')}C / {ult.count('V')}V / {ult.count('E')}E"
 
-# Comparações posicionais
 def comparar_linhas_posicionais(h):
     linhas_validas = [r for r in h if r in ["C", "V", "E"]]
     if len(linhas_validas) < 54:
@@ -124,11 +122,11 @@ def sugestao(h):
     maior = max(contagens, key=contagens.get)
     return f"📊 Tendência favorece entrada em {bolha_cor(maior)} ({maior})"
 
-# Interface
+# Interface principal
 st.set_page_config(page_title="Football Studio – Radar Estratégico", layout="wide")
 st.title("🎲 Football Studio Live — Leitura de Padrões")
 
-# Entrada manual
+# Entrada de dados
 col1, col2, col3, col4 = st.columns(4)
 if col1.button("➕ Casa (C)"): adicionar_resultado("C")
 if col2.button("➕ Visitante (V)"): adicionar_resultado("V")
@@ -137,7 +135,7 @@ if col4.button("🗂️ Novo baralho"): adicionar_resultado("🔽")
 
 h = st.session_state.historico
 
-# Sugestão principal
+# Sugestão
 st.subheader("🎯 Sugestão estratégica")
 st.success(sugestao(h))
 
@@ -168,7 +166,7 @@ st.write(f"Blocos espelhados: **{blocos_espelhados(h)}**")
 st.write(f"Alternância por linha: **{alternancia_por_linha(h)}**")
 st.write(f"Tendência final: **{tendencia_final(h)}**")
 
-# Comparações posicionais
+# Comparações por linha
 st.subheader("🧩 Semelhança por linha (1×4, 2×5, 3×6)")
 for comp in comparar_linhas_posicionais(h):
     st.write(comp)
@@ -183,25 +181,4 @@ if eco_visual(h) == "Detectado":
 if eco_parcial(h).startswith(("4", "5", "6")):
     alertas.append("🧠 Eco parcial — padrão reescrito com semelhança")
 if dist_empates(h) == 1:
-    alertas.append("🟨 Empates consecutivos — instabilidade")
-if blocos_espelhados(h) >= 1:
-    alert
-    if blocos_espelhados(h) >= 1:
-    alertas.append("🧩 Bloco espelhado — comportamento reflexivo")
-
-for comp in comparar_linhas_posicionais(h):
-    if "semelhantes" in comp and comp != "Poucos dados para comparação":
-        qtd = int(comp.split(":")[1].split("/")[0])
-        if qtd >= 7:
-            alertas.append("🧬 Reescrita posicional detectada — padrão refletido por linha")
-
-if not alertas:
-    st.info("✅ Nenhum padrão crítico identificado.")
-else:
-    for alerta in alertas:
-        st.warning(alerta)
-
-# Botão de limpeza
-if st.button("🧹 Limpar histórico"):
-    st.session_state.historico = []
-    st.rerun()
+    alertas.append("🟨 Empates
