@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Histórico expandido
+# Histórico expandido até 300 entradas
 if "historico" not in st.session_state:
     st.session_state.historico = []
 
@@ -12,7 +12,14 @@ def adicionar_resultado(valor):
 def get_valores(h):
     return [r for r in h if r in ["C", "V", "E"]][-27:]
 
-# Funções preditivas
+def bolha_cor(r):
+    return {
+        "C": "🟥",
+        "V": "🟦",
+        "E": "🟨",
+        "🔽": "⬇️"
+    }.get(r, "⬜")
+
 def maior_sequencia(h):
     h = get_valores(h)
     max_seq = atual = 1
@@ -35,9 +42,7 @@ def sequencia_final(h):
             count += 1
         else:
             break
-    return count
-
-def alternancia(h):
+            def alternancia(h):
     h = get_valores(h)
     return sum(1 for i in range(1, len(h)) if h[i] != h[i - 1])
 
@@ -78,8 +83,8 @@ def tendencia_final(h):
     h = get_valores(h)
     ult = h[-5:]
     return f"{ult.count('C')}C / {ult.count('V')}V / {ult.count('E')}E"
-
-def comparar_linhas_posicionais(h):
+    return count
+    def comparar_linhas_posicionais(h):
     linhas_validas = [r for r in h if r in ["C", "V", "E"]]
     if len(linhas_validas) < 54:
         return ["Poucos dados para comparação"]
@@ -90,14 +95,6 @@ def comparar_linhas_posicionais(h):
         iguais = sum(1 for x, y in zip(l1, l2) if x == y or (x in "CV" and y in "CV"))
         resultados.append(f"Linha {atual} × {espelho}: {iguais}/9 semelhantes")
     return resultados
-
-def bolha_cor(r):
-    return {
-        "C": "🟥",
-        "V": "🟦",
-        "E": "🟨",
-        "🔽": "⬇️"
-    }.get(r, "⬜")
 
 def sugestao(h):
     valores = get_valores(h)
@@ -127,7 +124,7 @@ def sugestao(h):
 st.set_page_config(page_title="Football Studio – Radar Estratégico", layout="wide")
 st.title("🎲 Football Studio Live — Leitura de Padrões")
 
-# Entrada de dados
+# Entrada de resultados
 col1, col2, col3, col4 = st.columns(4)
 if col1.button("➕ Casa (C)"): adicionar_resultado("C")
 if col2.button("➕ Visitante (V)"): adicionar_resultado("V")
@@ -136,12 +133,12 @@ if col4.button("🗂️ Novo baralho"): adicionar_resultado("🔽")
 
 h = st.session_state.historico
 
-# Sugestão
+# Sugestão preditiva
 st.subheader("🎯 Sugestão estratégica")
 st.success(sugestao(h))
 
-# Histórico visual
-st.subheader("🧾 Histórico visual (até 300 resultados)")
+# Histórico visual (zona ativa + espectadora)
+st.subheader("🧾 Histórico visual")
 h_reverso = h[::-1]
 bolhas = [bolha_cor(r) for r in h_reverso]
 for i in range(0, len(bolhas), 9):
@@ -167,7 +164,7 @@ st.write(f"Blocos espelhados: **{blocos_espelhados(h)}**")
 st.write(f"Alternância por linha: **{alternancia_por_linha(h)}**")
 st.write(f"Tendência final: **{tendencia_final(h)}**")
 
-# Comparações por linha
+# Comparação entre linhas
 st.subheader("🧩 Semelhança por linha (1×4, 2×5, 3×6)")
 for comp in comparar_linhas_posicionais(h):
     st.write(comp)
@@ -184,4 +181,19 @@ if eco_parcial(h).startswith(("4", "5", "6")):
 if dist_empates(h) == 1:
     alertas.append("🟨 Empates consecutivos — momento instável")
 if blocos_espelhados(h) >= 1:
-    alertas.append("🧩 Bloco espelhado — comportamento reflex
+    alertas.append("🧩 Bloco espelhado — comportamento reflexivo")
+for comp in comparar_linhas_posicionais(h):
+    if "semelhantes" in comp and comp != "Poucos dados para comparação":
+        qtd = int(comp.split(":")[1].split("/")[0])
+        if qtd >= 7:
+            alertas.append("🧬 Reescrita posicional detectada — padrão refletido por linha")
+if not alertas:
+    st.info("✅ Nenhum padrão crítico identificado.")
+else:
+    for alerta in alertas:
+        st.warning(alerta)
+
+# Botão para limpar histórico
+if st.button("🧹 Limpar histórico"):
+    st.session_state.historico = []
+    st.rerun()
