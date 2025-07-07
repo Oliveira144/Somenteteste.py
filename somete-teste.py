@@ -12,6 +12,7 @@ def adicionar_resultado(valor):
 def get_valores(h):
     return [r for r in h if r in ["C", "V", "E"]][-27:]
 
+# Funções preditivas
 def maior_sequencia(h):
     h = get_valores(h)
     max_seq = atual = 1
@@ -181,4 +182,6 @@ if eco_visual(h) == "Detectado":
 if eco_parcial(h).startswith(("4", "5", "6")):
     alertas.append("🧠 Eco parcial — padrão reescrito com semelhança")
 if dist_empates(h) == 1:
-    alertas.append("🟨 Empates
+    alertas.append("🟨 Empates consecutivos — momento instável")
+if blocos_espelhados(h) >= 1:
+    alertas.append("🧩 Bloco espelhado — comportamento reflex
