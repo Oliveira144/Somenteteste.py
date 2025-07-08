@@ -375,8 +375,7 @@ if not history_lines:
     st.info("O histórico está vazio. Adicione um resultado para começar a análise visual e de padrões.")
 else:
     for i, line in enumerate(history_lines):
-        # AQUI FOI FEITA A CORREÇÃO PRINCIPAL: Adicionado unsafe_allow_html=True
-        # ao st.markdown que renderiza o HTML da linha completa do histórico.
+        # AQUI ESTÁ A CHAVE: unsafe_allow_html=True garantindo que o HTML seja interpretado.
         st.markdown(f"""
         <div style="display: flex; align-items: center; margin-bottom: 4px;">
             <div class="line-number-box">
