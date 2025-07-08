@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from collections import Counter
 import json
@@ -30,7 +31,7 @@ def save_history(history):
     with open(HISTORY_FILE, 'w') as f:
         json.dump(history, f)
 
-# --- Funções de Análise Inteligente ---
+# --- Funções de Análise ---
 def get_history_lines(history):
     lines = []
     reversed_history = history[::-1]
@@ -147,124 +148,31 @@ def calculate_stats(history):
     }
     return stats
 
-# --- Interface Streamlit ---
+# --- Interface ---
 st.set_page_config(layout="wide", page_title="Football Studio Analyzer Inteligente")
 
-# Injeção de CSS personalizado
-st.markdown("""
-<style>
-    .stApp {
-        background-color: #f0f2f6;
-        color: #333;
-    }
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        max-width: 1200px;
-    }
-    h1, h2, h3 {
-        color: #1a202c;
-    }
-    .stButton>button {
-        width: 100%;
-        padding: 1rem 0;
-        border-radius: 0.5rem;
-        font-weight: bold;
-        font-size: 1.1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        transition: background-color 0.2s ease-in-out;
-    }
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(1) {
-        background-color: #EF4444; border: none; color: white;
-    }
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(1):hover { background-color: #DC2626; }
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(2) {
-        background-color: #3B82F6; border: none; color: white;
-    }
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(2):hover { background-color: #2563EB; }
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(3) {
-        background-color: #FACC15; border: none; color: black;
-    }
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(3):hover { background-color: #EAB308; }
-    .color-box-container {
-        display: flex;
-        gap: 4px;
-        margin-bottom: 4px;
-        align-items: center;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 5px;
-    }
-    .color-box {
-        width: 36px;
-        min-width: 36px;
-        height: 36px;
-        border-radius: 4px;
-        border: 2px solid #D1D5DB;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 0.875rem;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        flex-shrink: 0;
-    }
-    .line-number-box {
-        width: 30px;
-        min-width: 30px;
-        font-size: 0.75rem;
-        color: gray;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        margin-right: 4px;
-        font-weight: bold;
-    }
-    .suggestion-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid;
-        margin-bottom: 0.75rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    .confidence-high { border-color: #22C55E; background-color: #ECFDF5; }
-    .confidence-medium { border-color: #FBBF24; background-color: #FFFBEB; }
-    .confidence-low { border-color: #EF4444; background-color: #FEF2F2; }
-</style>
-""", unsafe_allow_html=True)
-
-# Inicialização do estado da sessão
+# Inicialização
 if 'history' not in st.session_state:
     st.session_state.history = load_history()
 
 st.title("⚽ Football Studio - Analisador de Padrões Inteligente")
 st.markdown("Analise o histórico de resultados, com foco na **identificação de padrões de linhas que se repetem**, para auxiliar nas suas decisões.")
 
-# --- Seção de Adição de Resultado ---
+# --- Entrada de Resultados ---
 st.header("Adicionar Novo Resultado")
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    if st.button("🔴 Casa (R)", key="add_R"):
+    if st.button("🔴 Casa (R)"):
         st.session_state.history.append('R')
         save_history(st.session_state.history)
         st.rerun()
-
 with col2:
-    if st.button("🔵 Visitante (B)", key="add_B"):
+    if st.button("🔵 Visitante (B)"):
         st.session_state.history.append('B')
         save_history(st.session_state.history)
         st.rerun()
-
 with col3:
-    if st.button("🟡 Empate (Y)", key="add_Y"):
+    if st.button("🟡 Empate (Y)"):
         st.session_state.history.append('Y')
         save_history(st.session_state.history)
         st.rerun()
@@ -274,138 +182,68 @@ st.markdown("---")
 # --- Estatísticas ---
 st.header("Estatísticas Atuais")
 stats = calculate_stats(st.session_state.history)
-
 if stats['total'] == 0:
     st.info("Adicione resultados para ver as estatísticas de ocorrência.")
 else:
     col_stats_1, col_stats_2, col_stats_3, col_stats_4 = st.columns(4)
     with col_stats_1:
-        st.markdown(f"""
-        <div style="background-color: #60A5FA; color: white; padding: 1rem; border-radius: 0.5rem;">
-            <div style="font-size: 0.875rem; opacity: 0.9;">Total de Jogos</div>
-            <div style="font-size: 1.8rem; font-weight: bold;">{stats['total']}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Total de Jogos", stats['total'])
     with col_stats_2:
-        st.markdown(f"""
-        <div style="background-color: {COLOR_MAP['R']['color_hex']}; color: white; padding: 1rem; border-radius: 0.5rem;">
-            <div style="font-size: 0.875rem; opacity: 0.9;">Casa (Home)</div>
-            <div style="font-size: 1.5rem; font-weight: bold;">{stats['percentages']['R']}%</div>
-            <div style="font-size: 0.875rem; opacity: 0.9;">({stats['counts'].get('R', 0)} jogos)</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Casa", f"{stats['percentages']['R']}% ({stats['counts'].get('R',0)})")
     with col_stats_3:
-        st.markdown(f"""
-        <div style="background-color: {COLOR_MAP['B']['color_hex']}; color: white; padding: 1rem; border-radius: 0.5rem;">
-            <div style="font-size: 0.875rem; opacity: 0.9;">Visitante (Away)</div>
-            <div style="font-size: 1.5rem; font-weight: bold;">{stats['percentages']['B']}%</div>
-            <div style="font-size: 0.875rem; opacity: 0.9;">({stats['counts'].get('B', 0)} jogos)</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Visitante", f"{stats['percentages']['B']}% ({stats['counts'].get('B',0)})")
     with col_stats_4:
-        st.markdown(f"""
-        <div style="background-color: {COLOR_MAP['Y']['color_hex']}; color: {COLOR_MAP['Y']['text_color']}; padding: 1rem; border-radius: 0.5rem;">
-            <div style="font-size: 0.875rem; opacity: 0.9;">Empate (Draw)</div>
-            <div style="font-size: 1.5rem; font-weight: bold;">{stats['percentages']['Y']}%</div>
-            <div style="font-size: 0.875rem; opacity: 0.9;">({stats['counts'].get('Y', 0)} jogos)</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Empate", f"{stats['percentages']['Y']}% ({stats['counts'].get('Y',0)})")
 
 st.markdown("---")
 
-# --- Histórico Visual ---
+# --- Histórico Corrigido ---
 st.header("Histórico de Jogos (Mais Recente Primeiro)")
-
 history_lines = get_history_lines(st.session_state.history)
-
 if not history_lines:
-    st.info("O histórico está vazio. Adicione um resultado para começar a análise visual e de padrões.")
+    st.info("O histórico está vazio. Adicione um resultado para começar.")
 else:
     for i, line in enumerate(history_lines):
-        # Geração dinâmica do HTML para cada linha
+        line_number = f"<strong>{i+1}</strong>" if i == ANALYSIS_LINE_INDEX else f"{i+1}"
         line_html = f"""
         <div style="display: flex; align-items: center; margin-bottom: 4px;">
-            <div class="line-number-box">
-                {f"<strong>{i+1}</strong>" if i == ANALYSIS_LINE_INDEX else i+1}
-            </div>
-            <div class="color-box-container">
-        """
-        
-        # Adiciona as caixas coloridas para cada resultado
+            <div style='width: 30px; font-size: 0.75rem; color: gray; margin-right: 4px; font-weight: bold;'>{line_number}</div>
+            <div style='display: flex; gap: 4px;'>"""
         for color in line:
             color_info = COLOR_MAP[color]
-            line_html += f"""
-                <div class="color-box" style="background-color: {color_info['color_hex']}; color: {color_info['text_color']};">
-                    {color}
-                </div>
-            """
-        
-        # Preenche com caixas vazias se a linha não estiver completa
+            line_html += f"""<div style='width: 36px; height: 36px; background-color: {color_info['color_hex']}; color: {color_info['text_color']}; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-weight: bold;'>{color}</div>"""
         for _ in range(LINE_LENGTH - len(line)):
-            line_html += """
-                <div class="color-box" style="background-color: #E5E7EB; color: #9CA3AF;">-</div>
-            """
-        
-        line_html += """
-            </div>
-        </div>
-        """
-        
-        st.markdown(line_html, unsafe_allow_html=True)
-    
-    st.caption(f"A **análise de repetição de linha** está focada na **linha {ANALYSIS_LINE_INDEX + 1}** (contando a partir da mais recente no histórico).")
+            line_html += """<div style='width: 36px; height: 36px; background-color: #E5E7EB; color: #9CA3AF; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-weight: bold;'>-</div>"""
+        line_html += "</div></div>"
+        components.html(line_html, height=60, scrolling=False)
+
+    st.caption(f"A análise está focada na linha {ANALYSIS_LINE_INDEX + 1} (contando da mais recente para a mais antiga).")
 
 st.markdown("---")
 
 # --- Sugestões Inteligentes ---
 st.header("Sugestões de Entrada Inteligentes")
-
-all_suggestions = []
-line_repetition_suggestions = analyze_repeating_line_patterns(st.session_state.history, history_lines)
-all_suggestions.extend(line_repetition_suggestions)
-general_pattern_suggestions = analyze_general_patterns(st.session_state.history)
-all_suggestions.extend(general_pattern_suggestions)
+all_suggestions = analyze_repeating_line_patterns(st.session_state.history, history_lines)
+all_suggestions.extend(analyze_general_patterns(st.session_state.history))
 
 if not all_suggestions:
-    st.info("Adicione mais resultados ao histórico para que a IA possa analisar e gerar sugestões. A análise de 'repetição de linha' precisa de um histórico mais longo para identificar padrões.")
+    st.info("Adicione mais resultados para ativar as sugestões.")
 else:
     for suggestion in all_suggestions:
         color_info = COLOR_MAP[suggestion['suggestion']]
-        
-        confidence_class = "confidence-low"
-        if suggestion['confidence'] >= 70:
-            confidence_class = "confidence-high"
-        elif suggestion['confidence'] >= 50:
-            confidence_class = "confidence-medium"
-
-        st.markdown(f"""
-        <div class="suggestion-box {confidence_class}">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-weight: bold; color: #1F2937;">{suggestion['type']}</span>
-                <span style="font-size: 0.875rem; background-color: #E5E7EB; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">
-                    {suggestion['confidence']}% confiança
-                </span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div class="color-box" style="background-color: {color_info['color_hex']}; color: {color_info['text_color']};">
-                    {suggestion['suggestion']}
-                </div>
-                <span style="font-weight: 500; color: #374151;">
-                    Próxima sug. → **{color_info['name']}**
-                </span>
-            </div>
-            <div style="font-size: 0.875rem; color: #4B5563; margin-top: 0.5rem;">
-                {suggestion['reason']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.success(f"""
+        ✅ **{suggestion['type']}**  
+        🎯 **Sugestão**: {color_info['name']} ({suggestion['suggestion']})  
+        📊 Confiança: {suggestion['confidence']}%  
+        🧠 {suggestion['reason']}
+        """)
 
 st.markdown("---")
 
 # --- Botão de Limpar Histórico ---
-if st.button("🗑️ Limpar Histórico", key="clear_history_btn"):
+if st.button("🗑️ Limpar Histórico"):
     st.session_state.history = []
     save_history([])
     st.rerun()
 
-st.caption("Desenvolvido por seu Engenheiro de Computação para análise de padrões em Football Studio.")
+st.caption("Desenvolvido por Helio Oliveira - Análise Inteligente para Football Studio 🎯")
