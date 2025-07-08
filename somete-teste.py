@@ -243,9 +243,17 @@ st.markdown("""
     }
     .stButton button[data-testid="stButton-primary"]:nth-of-type(3):hover { background-color: #EAB308; }
 
+    /* NOVO/AJUSTADO: Estilos para as caixas de cor no histórico */
+    .color-box-container {
+        display: flex;
+        gap: 4px; /* Espaçamento entre as caixas */
+        margin-bottom: 4px; /* Espaçamento entre as linhas */
+        align-items: center; /* Centraliza verticalmente */
+    }
     .color-box {
-        width: 40px;
-        height: 40px;
+        width: 36px; /* Largura fixa */
+        min-width: 36px; /* Garante que não encolhe */
+        height: 36px; /* Altura fixa */
         border-radius: 4px;
         border: 2px solid #D1D5DB; /* lightgray-300 */
         display: flex;
@@ -254,7 +262,21 @@ st.markdown("""
         font-weight: bold;
         font-size: 0.875rem; /* text-sm */
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Pequena sombra */
+        flex-shrink: 0; /* Impede que a caixa encolha */
     }
+    /* Ajuste para o número da linha */
+    .line-number-box {
+        width: 30px;
+        min-width: 30px;
+        font-size: 0.75rem;
+        color: gray;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-right: 4px; /* Espaçamento entre o número da linha e as caixas */
+    }
+
     .suggestion-box {
         padding: 1rem;
         border-radius: 0.5rem;
@@ -348,28 +370,28 @@ if not history_lines:
     st.info("O histórico está vazio. Adicione um resultado para começar a análise visual e de padrões.")
 else:
     for i, line in enumerate(history_lines):
+        # Usamos uma única coluna para conter a linha inteira, e dentro dela, um flexbox para as caixas de cor.
+        # Isso garante que a linha se comporte como um bloco único.
+        
         # O primeiro elemento da coluna é para o número da linha
-        cols = st.columns([0.05] + [1] * LINE_LENGTH) 
-        
-        # Número da linha (i+1 para começar do 1, e marcamos a linha de análise)
-        line_label = f"{i+1}"
-        if i == ANALYSIS_LINE_INDEX:
-            line_label = f"**{i+1}**" # Destaca a linha de análise
-        cols[0].markdown(f"<div style='font-size: 0.75rem; color: gray; width: 30px; display: flex; align-items: center; justify-content: center;'>{line_label}</div>", unsafe_allow_html=True)
-        
-        for j, color in enumerate(line):
-            color_info = COLOR_MAP[color]
-            cols[j+1].markdown(f"""
-            <div class="color-box" style="background-color: {color_info['color_hex']}; color: {color_info['text_color']};">
-                {color}
+        # Criamos um container flex para a linha inteira
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+            <div class="line-number-box">
+                {f"**{i+1}**" if i == ANALYSIS_LINE_INDEX else i+1}
             </div>
-            """, unsafe_allow_html=True)
-        
-        # Preencher espaços vazios com caixas cinzas se a linha não estiver completa
-        for j in range(len(line), LINE_LENGTH):
-            cols[j+1].markdown("""
-            <div class="color-box" style="background-color: #E5E7EB; color: #9CA3AF;">-</div>
-            """, unsafe_allow_html=True)
+            <div class="color-box-container">
+                {''.join([f'''
+                <div class="color-box" style="background-color: {COLOR_MAP[color]['color_hex']}; color: {COLOR_MAP[color]['text_color']};">
+                    {color}
+                </div>
+                ''' for color in line])}
+                {''.join([f'''
+                <div class="color-box" style="background-color: #E5E7EB; color: #9CA3AF;">-</div>
+                ''' for _ in range(LINE_LENGTH - len(line))])}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.caption(f"A **análise de repetição de linha** está focada na **linha {ANALYSIS_LINE_INDEX + 1}** (contando a partir da mais recente no histórico).")
 
