@@ -5,60 +5,42 @@ import json
 import os
 
 # --- Configurações Iniciais ---
-# Nome do arquivo para persistir o histórico.
-# ATENÇÃO: No Streamlit Community Cloud, este arquivo é volátil e pode ser resetado
-# após atualizações ou reinícios do servidor. Para persistência robusta, use um DB externo.
 HISTORY_FILE = 'football_studio_history.json'
-LINE_LENGTH = 9 # Quantidade de resultados por linha visual
-ANALYSIS_LINE_INDEX = 3 # A quarta linha (índice 3, pois contamos a partir de 0) para análise de repetição.
-                        # Ex: 0 = 1ª linha, 1 = 2ª linha, 2 = 3ª linha, 3 = 4ª linha.
+LINE_LENGTH = 9
+ANALYSIS_LINE_INDEX = 3
 
 # --- Mapeamento de Cores ---
 COLOR_MAP = {
-    'R': {'name': 'Casa (Home)', 'color_hex': '#EF4444', 'text_color': 'white'}, # Vermelho
-    'B': {'name': 'Visitante (Away)', 'color_hex': '#3B82F6', 'text_color': 'white'}, # Azul
-    'Y': {'name': 'Empate (Draw)', 'color_hex': '#FACC15', 'text_color': 'black'} # Amarelo
+    'R': {'name': 'Casa (Home)', 'color_hex': '#EF4444', 'text_color': 'white'},
+    'B': {'name': 'Visitante (Away)', 'color_hex': '#3B82F6', 'text_color': 'white'},
+    'Y': {'name': 'Empate (Draw)', 'color_hex': '#FACC15', 'text_color': 'black'}
 }
 
-# --- Funções de Persistência Local (via arquivo) ---
+# --- Funções de Persistência Local ---
 def load_history():
-    """Carrega o histórico de jogos do arquivo JSON."""
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as f:
             try:
                 return json.load(f)
             except json.JSONDecodeError:
-                # Retorna lista vazia se o JSON estiver corrompido
                 return []
     return []
 
 def save_history(history):
-    """Salva o histórico de jogos no arquivo JSON."""
     with open(HISTORY_FILE, 'w') as f:
         json.dump(history, f)
 
 # --- Funções de Análise Inteligente ---
-
 def get_history_lines(history):
-    """
-    Organiza o histórico linear em blocos (linhas) para visualização e análise.
-    A linha 0 é a mais recente.
-    """
     lines = []
-    # Inverte o histórico para que as linhas mais recentes apareçam primeiro na visualização
     reversed_history = history[::-1]
     for i in range(0, len(reversed_history), LINE_LENGTH):
         lines.append(reversed_history[i : i + LINE_LENGTH])
     return lines
 
 def analyze_repeating_line_patterns(history, history_lines):
-    """
-    Analisa se uma linha específica (definida por ANALYSIS_LINE_INDEX) está se repetindo
-    e tenta identificar o padrão de continuação.
-    """
     suggestions = []
     
-    # Verifica se há linhas suficientes para analisar a linha alvo
     if len(history_lines) <= ANALYSIS_LINE_INDEX:
         return suggestions 
 
@@ -66,40 +48,25 @@ def analyze_repeating_line_patterns(history, history_lines):
     target_line_str = "".join(target_line)
 
     found_matches = []
-    # Percorre todas as linhas no histórico (exceto a linha alvo)
     for i, current_line in enumerate(history_lines):
         if i == ANALYSIS_LINE_INDEX: 
-            continue # Não compara a linha com ela mesma
+            continue
 
         current_line_str = "".join(current_line)
         
-        # Compara a linha alvo com a linha atual do loop.
-        # Verifica se são idênticas ou se a linha atual é um prefixo da linha alvo.
-        # Isso ajuda a pegar padrões que ainda estão sendo "formados" na linha alvo.
         if target_line_str == current_line_str:
             found_matches.append({'index_line': i, 'line_content': current_line, 'type': 'Exata'})
         elif target_line_str.startswith(current_line_str):
              found_matches.append({'index_line': i, 'line_content': current_line, 'type': 'Prefixo'})
 
-
     if found_matches:
         reason_base = f"A linha atual (índice {ANALYSIS_LINE_INDEX+1} - '{target_line_str}') foi detectada como similar a padrões anteriores."
         
-        # Tenta prever a próxima cor baseada no que veio após a linha em correspondências passadas.
         potential_next_colors = Counter()
         for match in found_matches:
-            # Calcular o índice no histórico ORIGINAL (não invertido) onde a linha de correspondência termina
-            # history_lines[match['index_line']] corresponde ao que veio ANTES no histórico original.
-            # O índice 0 em history_lines é a linha mais RECENTE.
-            # Então, para um match em history_lines[i], o fim dessa linha no histórico original
-            # seria: (total_de_linhas - 1 - i) * LINE_LENGTH + len(match['line_content']) - 1 (se a linha estiver completa)
-            
-            # Mais simples: A entrada no histórico original que corresponde ao INÍCIO da linha de match
             start_index_in_original = len(history) - ((match['index_line'] + 1) * LINE_LENGTH)
-            # A entrada no histórico original que corresponde ao FIM da linha de match
             end_index_in_original = start_index_in_original + len(match['line_content']) -1
             
-            # Se existe uma próxima entrada no histórico original após essa linha de correspondência
             if end_index_in_original + 1 < len(history):
                 next_entry = history[end_index_in_original + 1]
                 potential_next_colors[next_entry] += 1
@@ -115,30 +82,24 @@ def analyze_repeating_line_patterns(history, history_lines):
                 'confidence': confidence,
                 'reason': f"{reason_base} Com base em ocorrências anteriores de padrões similares, a próxima cor mais comum foi **{COLOR_MAP[most_likely_next]['name']}** ({count}/{total_next} vezes)."
             })
-        else: # Se não há continuação clara, sugere a cor mais comum na própria linha
+        else:
             color_counts_target_line = Counter(target_line)
             if color_counts_target_line:
                 most_common_color_in_line, _ = color_counts_target_line.most_common(1)[0]
                 suggestions.append({
                     'type': 'Repetição de Linha (Cor Dominante)',
                     'suggestion': most_common_color_in_line,
-                    'confidence': 60, # Confiança um pouco menor se não houver um "próximo" claro
+                    'confidence': 60,
                     'reason': f"{reason_base} A cor dominante nesta linha repetida é **{COLOR_MAP[most_common_color_in_line]['name']}**. Pode continuar."
                 })
 
     return suggestions
 
-
 def analyze_general_patterns(history):
-    """
-    Função para análise de padrões mais gerais como transições e quebra de sequência,
-    complementar à análise de repetição de linhas.
-    """
     suggestions = []
-    if len(history) < 2: # Precisa de um mínimo de resultados para certas análises
+    if len(history) < 2:
         return suggestions
 
-    # Análise de Transições (o que vem depois da última cor)
     last_color = history[-1]
     transitions = {c: Counter() for c in COLOR_MAP.keys()}
     for i in range(len(history) - 1):
@@ -155,7 +116,6 @@ def analyze_general_patterns(history):
             'reason': f"Após **{COLOR_MAP[last_color]['name']}**, a cor **{COLOR_MAP[most_likely_next_transition]['name']}** apareceu {count_transition} de {total_transitions} vezes no histórico."
         })
 
-    # Análise de "Quebra de Padrão" (quando há muitas repetições da mesma cor)
     consecutive_count = 0
     if history:
         last_val = history[-1]
@@ -165,22 +125,19 @@ def analyze_general_patterns(history):
             else:
                 break
     
-    if consecutive_count >= 3: # Sugere uma quebra após 3 ou mais resultados consecutivos
+    if consecutive_count >= 3:
         opposite_colors = [c for c in COLOR_MAP.keys() if c != last_val]
-        # Aqui, poderíamos adicionar lógica para escolher a "oposta" mais provável,
-        # mas por simplicidade, pegamos a primeira que não seja a cor atual.
         if opposite_colors:
             suggestions.append({
                 'type': 'Quebra de Sequência Longa',
                 'suggestion': opposite_colors[0], 
-                'confidence': 60, # Confiança média, pois não é um padrão exato
+                'confidence': 60,
                 'reason': f"Foram **{consecutive_count}** resultados consecutivos de **{COLOR_MAP[last_val]['name']}**. Há uma chance de quebra de padrão."
             })
     
     return suggestions
 
 def calculate_stats(history):
-    """Calcula estatísticas de ocorrência percentual das cores no histórico."""
     total = len(history)
     counts = Counter(history)
     stats = {
@@ -193,16 +150,11 @@ def calculate_stats(history):
 # --- Interface Streamlit ---
 st.set_page_config(layout="wide", page_title="Football Studio Analyzer Inteligente")
 
-# Inicializa o histórico na sessão do Streamlit se ainda não existir
-# Isso garante que o estado é mantido entre reruns
-if 'history' not in st.session_state:
-    st.session_state.history = load_history()
-
-# Injeção de CSS personalizado para estilização (Tailwind-like)
+# Injeção de CSS personalizado
 st.markdown("""
 <style>
     .stApp {
-        background-color: #f0f2f6; /* Cor de fundo geral */
+        background-color: #f0f2f6;
         color: #333;
     }
     .main .block-container {
@@ -210,10 +162,10 @@ st.markdown("""
         padding-bottom: 2rem;
         padding-left: 1rem;
         padding-right: 1rem;
-        max-width: 1200px; /* Limita a largura do conteúdo */
+        max-width: 1200px;
     }
     h1, h2, h3 {
-        color: #1a202c; /* Cores de título mais escuras */
+        color: #1a202c;
     }
     .stButton>button {
         width: 100%;
@@ -227,48 +179,42 @@ st.markdown("""
         gap: 0.5rem;
         transition: background-color 0.2s ease-in-out;
     }
-    /* Estilos específicos para os botões de resultado */
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(1) { /* Botão Casa */
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(1) {
         background-color: #EF4444; border: none; color: white;
     }
     .stButton button[data-testid="stButton-primary"]:nth-of-type(1):hover { background-color: #DC2626; }
-
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(2) { /* Botão Visitante */
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(2) {
         background-color: #3B82F6; border: none; color: white;
     }
     .stButton button[data-testid="stButton-primary"]:nth-of-type(2):hover { background-color: #2563EB; }
-
-    .stButton button[data-testid="stButton-primary"]:nth-of-type(3) { /* Botão Empate */
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(3) {
         background-color: #FACC15; border: none; color: black;
     }
     .stButton button[data-testid="stButton-primary"]:nth-of-type(3):hover { background-color: #EAB308; }
-
-    /* NOVO/AJUSTADO: Estilos para as caixas de cor no histórico */
     .color-box-container {
         display: flex;
-        gap: 4px; /* Espaçamento entre as caixas */
-        margin-bottom: 4px; /* Espaçamento entre as linhas */
-        align-items: center; /* Centraliza verticalmente */
-        flex-wrap: nowrap; /* Garante que as caixas não quebrem linha */
-        overflow-x: auto; /* Adiciona scroll se a tela for muito pequena */
-        -webkit-overflow-scrolling: touch; /* Melhor rolagem em dispositivos móveis */
-        padding-bottom: 5px; /* Para evitar que a barra de rolagem corte conteúdo */
+        gap: 4px;
+        margin-bottom: 4px;
+        align-items: center;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 5px;
     }
     .color-box {
-        width: 36px; /* Largura fixa */
-        min-width: 36px; /* Garante que não encolhe */
-        height: 36px; /* Altura fixa */
+        width: 36px;
+        min-width: 36px;
+        height: 36px;
         border-radius: 4px;
-        border: 2px solid #D1D5DB; /* lightgray-300 */
+        border: 2px solid #D1D5DB;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: bold;
-        font-size: 0.875rem; /* text-sm */
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Pequena sombra */
-        flex-shrink: 0; /* Impede que a caixa encolha */
+        font-size: 0.875rem;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        flex-shrink: 0;
     }
-    /* Ajuste para o número da linha */
     .line-number-box {
         width: 30px;
         min-width: 30px;
@@ -278,22 +224,25 @@ st.markdown("""
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        margin-right: 4px; /* Espaçamento entre o número da linha e as caixas */
-        font-weight: bold; /* Para destacar o número da linha */
+        margin-right: 4px;
+        font-weight: bold;
     }
-
     .suggestion-box {
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 4px solid;
         margin-bottom: 0.75rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Sombra mais pronunciada */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
-    .confidence-high { border-color: #22C55E; background-color: #ECFDF5; } /* green-500, green-50 */
-    .confidence-medium { border-color: #FBBF24; background-color: #FFFBEB; } /* yellow-500, yellow-50 */
-    .confidence-low { border-color: #EF4444; background-color: #FEF2F2; } /* red-500, red-50 */
+    .confidence-high { border-color: #22C55E; background-color: #ECFDF5; }
+    .confidence-medium { border-color: #FBBF24; background-color: #FFFBEB; }
+    .confidence-low { border-color: #EF4444; background-color: #FEF2F2; }
 </style>
 """, unsafe_allow_html=True)
+
+# Inicialização do estado da sessão
+if 'history' not in st.session_state:
+    st.session_state.history = load_history()
 
 st.title("⚽ Football Studio - Analisador de Padrões Inteligente")
 st.markdown("Analise o histórico de resultados, com foco na **identificação de padrões de linhas que se repetem**, para auxiliar nas suas decisões.")
@@ -302,12 +251,11 @@ st.markdown("Analise o histórico de resultados, com foco na **identificação d
 st.header("Adicionar Novo Resultado")
 col1, col2, col3 = st.columns(3)
 
-# Botões de adição de resultado
 with col1:
     if st.button("🔴 Casa (R)", key="add_R"):
         st.session_state.history.append('R')
         save_history(st.session_state.history)
-        st.rerun() # Recarrega a página para atualizar as análises
+        st.rerun()
 
 with col2:
     if st.button("🔵 Visitante (B)", key="add_B"):
@@ -330,7 +278,6 @@ stats = calculate_stats(st.session_state.history)
 if stats['total'] == 0:
     st.info("Adicione resultados para ver as estatísticas de ocorrência.")
 else:
-    # Exibição das estatísticas em colunas com cores personalizadas
     col_stats_1, col_stats_2, col_stats_3, col_stats_4 = st.columns(4)
     with col_stats_1:
         st.markdown(f"""
@@ -375,24 +322,36 @@ if not history_lines:
     st.info("O histórico está vazio. Adicione um resultado para começar a análise visual e de padrões.")
 else:
     for i, line in enumerate(history_lines):
-        # AQUI ESTÁ A CHAVE: unsafe_allow_html=True garantindo que o HTML seja interpretado.
-        st.markdown(f"""
+        # Geração dinâmica do HTML para cada linha
+        line_html = f"""
         <div style="display: flex; align-items: center; margin-bottom: 4px;">
             <div class="line-number-box">
-                {f"**{i+1}**" if i == ANALYSIS_LINE_INDEX else i+1}
+                {f"<strong>{i+1}</strong>" if i == ANALYSIS_LINE_INDEX else i+1}
             </div>
             <div class="color-box-container">
-                {''.join([f'''
-                <div class="color-box" style="background-color: {COLOR_MAP[color]['color_hex']}; color: {COLOR_MAP[color]['text_color']};">
+        """
+        
+        # Adiciona as caixas coloridas para cada resultado
+        for color in line:
+            color_info = COLOR_MAP[color]
+            line_html += f"""
+                <div class="color-box" style="background-color: {color_info['color_hex']}; color: {color_info['text_color']};">
                     {color}
                 </div>
-                ''' for color in line])}
-                {''.join([f'''
+            """
+        
+        # Preenche com caixas vazias se a linha não estiver completa
+        for _ in range(LINE_LENGTH - len(line)):
+            line_html += """
                 <div class="color-box" style="background-color: #E5E7EB; color: #9CA3AF;">-</div>
-                ''' for _ in range(LINE_LENGTH - len(line))])}
+            """
+        
+        line_html += """
             </div>
         </div>
-        """, unsafe_allow_html=True) 
+        """
+        
+        st.markdown(line_html, unsafe_allow_html=True)
     
     st.caption(f"A **análise de repetição de linha** está focada na **linha {ANALYSIS_LINE_INDEX + 1}** (contando a partir da mais recente no histórico).")
 
@@ -402,12 +361,8 @@ st.markdown("---")
 st.header("Sugestões de Entrada Inteligentes")
 
 all_suggestions = []
-
-# 1. Análise de Repetição de Linha (principal foco e a nova inteligência)
 line_repetition_suggestions = analyze_repeating_line_patterns(st.session_state.history, history_lines)
 all_suggestions.extend(line_repetition_suggestions)
-
-# 2. Análise de Padrões Gerais (complementar)
 general_pattern_suggestions = analyze_general_patterns(st.session_state.history)
 all_suggestions.extend(general_pattern_suggestions)
 
@@ -417,7 +372,6 @@ else:
     for suggestion in all_suggestions:
         color_info = COLOR_MAP[suggestion['suggestion']]
         
-        # Determina a classe CSS da caixa de sugestão com base na confiança
         confidence_class = "confidence-low"
         if suggestion['confidence'] >= 70:
             confidence_class = "confidence-high"
@@ -449,11 +403,9 @@ else:
 st.markdown("---")
 
 # --- Botão de Limpar Histórico ---
-# Adiciona uma chave única para o botão, como boa prática no Streamlit
 if st.button("🗑️ Limpar Histórico", key="clear_history_btn"):
     st.session_state.history = []
-    save_history([]) # Garante que o arquivo também seja limpo
-    st.rerun() # Recarrega a página para refletir o histórico limpo
+    save_history([])
+    st.rerun()
 
 st.caption("Desenvolvido por seu Engenheiro de Computação para análise de padrões em Football Studio.")
-
