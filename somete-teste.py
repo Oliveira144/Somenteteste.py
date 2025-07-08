@@ -1,448 +1,436 @@
 import streamlit as st
+import pandas as pd
+from collections import Counter
+import json
+import os
 
-# Configuração de estilo CSS
-def load_css():
-    css = """
-    <style>
-    /* Estilos gerais */
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #f9fafb;
-    }
-    .stApp {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-    
-    /* Estilos para os botões */
-    .stButton>button {
-        border-radius: 10px;
-        font-weight: bold;
-        padding: 12px 24px;
-        width: 100%;
-        font-size: 16px;
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        transform: scale(1.03);
-        opacity: 0.9;
-    }
-    .btn-casa {
-        background-color: #ff4b4b !important;
-        color: white !important;
-        border: 2px solid #cc0000 !important;
-    }
-    .btn-visitante {
-        background-color: #1e90ff !important;
-        color: white !important;
-        border: 2px solid #0066cc !important;
-    }
-    .btn-empate {
-        background-color: #ffdd00 !important;
-        color: #333 !important;
-        border: 2px solid #ccaa00 !important;
-    }
-    .btn-baralho {
-        background-color: #4CAF50 !important;
-        color: white !important;
-        border: 2px solid #2E7D32 !important;
-    }
-    
-    /* Estilos para o grid de histórico */
-    .grid-container {
-        display: grid;
-        grid-template-columns: repeat(9, 1fr);
-        gap: 5px;
-        margin-bottom: 15px;
-    }
-    .grid-item {
-        font-size: 24px;
-        text-align: center;
-        padding: 10px;
-        border-radius: 8px;
-        background-color: #f0f2f6;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 50px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .grid-item-recente {
-        box-shadow: 0 0 0 3px #ff4b4b;
-    }
-    
-    /* Estilos para os cards de análise */
-    .metric-card {
-        background-color: #ffffff;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        border-left: 4px solid #4CAF50;
-    }
-    .metric-card h4 {
-        margin-top: 0;
-        color: #333;
-        font-size: 16px;
-    }
-    .metric-card div {
-        font-size: 24px;
-        font-weight: bold;
-        text-align: center;
-        color: #1a1a1a;
-    }
-    
-    /* Estilos para alertas */
-    .alerta-box {
-        border-radius: 10px;
-        padding: 15px;
-        margin: 10px 0;
-        background-color: #fff8e1;
-        border-left: 5px solid #ffc107;
-        font-size: 16px;
-    }
-    
-    /* Estilos para sugestão */
-    .sugestao-box {
-        background-color: #e8f5e9;
-        border-radius: 10px;
-        padding: 20px;
-        margin: 15px 0;
-        border-left: 5px solid #4CAF50;
-        font-size: 18px;
-        font-weight: bold;
-        text-align: center;
-    }
-    
-    /* Melhorias gerais */
-    .header-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .linha-label {
-        font-weight: bold;
-        margin-bottom: 5px;
-        font-size: 16px;
-        color: #333;
-    }
-    .stSubheader {
-        border-bottom: 2px solid #f0f2f6;
-        padding-bottom: 10px;
-        margin-top: 25px;
-    }
-    </style>
+# --- Configurações Iniciais ---
+# Nome do arquivo para persistir o histórico.
+# ATENÇÃO: No Streamlit Community Cloud, este arquivo é volátil e pode ser resetado
+# após atualizações ou reinícios do servidor. Para persistência robusta, use um DB externo.
+HISTORY_FILE = 'football_studio_history.json'
+LINE_LENGTH = 9 # Quantidade de resultados por linha visual
+ANALYSIS_LINE_INDEX = 3 # A quarta linha (índice 3, pois contamos a partir de 0) para análise de repetição.
+                        # Ex: 0 = 1ª linha, 1 = 2ª linha, 2 = 3ª linha, 3 = 4ª linha.
+
+# --- Mapeamento de Cores ---
+COLOR_MAP = {
+    'R': {'name': 'Casa (Home)', 'color_hex': '#EF4444', 'text_color': 'white'}, # Vermelho
+    'B': {'name': 'Visitante (Away)', 'color_hex': '#3B82F6', 'text_color': 'white'}, # Azul
+    'Y': {'name': 'Empate (Draw)', 'color_hex': '#FACC15', 'text_color': 'black'} # Amarelo
+}
+
+# --- Funções de Persistência Local (via arquivo) ---
+def load_history():
+    """Carrega o histórico de jogos do arquivo JSON."""
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r') as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                # Retorna lista vazia se o JSON estiver corrompido
+                return []
+    return []
+
+def save_history(history):
+    """Salva o histórico de jogos no arquivo JSON."""
+    with open(HISTORY_FILE, 'w') as f:
+        json.dump(history, f)
+
+# --- Funções de Análise Inteligente ---
+
+def get_history_lines(history):
     """
-    st.markdown(css, unsafe_allow_html=True)
+    Organiza o histórico linear em blocos (linhas) para visualização e análise.
+    A linha 0 é a mais recente.
+    """
+    lines = []
+    # Inverte o histórico para que as linhas mais recentes apareçam primeiro na visualização
+    reversed_history = history[::-1]
+    for i in range(0, len(reversed_history), LINE_LENGTH):
+        lines.append(reversed_history[i : i + LINE_LENGTH])
+    return lines
 
-# Carregar CSS
-load_css()
-
-# Histórico com limite automático de 100 entradas
-if "historico" not in st.session_state:
-    st.session_state.historico = []
-
-def adicionar_resultado(valor):
-    if len(st.session_state.historico) >= 100:
-        st.session_state.historico.pop(0)
-    st.session_state.historico.append(valor)
-
-# 🔍 Funções analíticas
-def get_valores(h):
-    return [r for r in h if r in ["C", "V", "E"]][-27:]
-
-def maior_sequencia(h):
-    h = get_valores(h)
-    if not h:
-        return 0
-    max_seq = atual = 1
-    for i in range(1, len(h)):
-        if h[i] == h[i-1]:
-            atual += 1
-            max_seq = max(max_seq, atual)
-        else:
-            atual = 1
-    return max_seq
-
-def sequencia_final(h):
-    h = get_valores(h)
-    if not h:
-        return 0
-    atual = h[-1]
-    count = 1
-    for i in range(len(h)-2, -1, -1):
-        if h[i] == atual:
-            count += 1
-        else:
-            break
-    return count
-
-def alternancia(h):
-    h = get_valores(h)
-    if len(h) < 2:
-        return 0
-    return sum(1 for i in range(1, len(h)) if h[i] != h[i-1])
-
-def eco_visual_por_linha(h):
-    h = get_valores(h)
-    if len(h) < 18:
-        return "Poucos dados"
-    ult = h[-9:]
-    penult = h[-18:-9]
-    return "Detectado" if ult == penult else "Não detectado"
-
-def eco_parcial_por_linha(h):
-    h = get_valores(h)
-    if len(h) < 18:
-        return "Poucos dados"
-    ult = h[-9:]
-    penult = h[-18:-9]
-    semelhantes = 0
-    for a, b in zip(penult, ult):
-        if a == b or (a in ['C','V'] and b in ['C','V']):
-            semelhantes += 1
-    return f"{semelhantes}/9 semelhantes"
-
-def dist_empates(h):
-    h = get_valores(h)
-    empates = [i for i, r in enumerate(h) if r == 'E']
-    if len(empates) >= 2:
-        distancia = empates[-1] - empates[-2]
-        return f"{distancia} jogadas"
-    return "N/A"
-
-def blocos_espelhados(h):
-    h = get_valores(h)
-    cont = 0
-    for i in range(len(h)-5):
-        if h[i:i+3] == h[i+3:i+6][::-1]:
-            cont += 1
-    return cont
-
-def tendencia_final(h):
-    h = get_valores(h)
-    if not h:
-        return "Sem dados"
-    ult = h[-9:] if len(h) >= 9 else h
-    return f"{ult.count('C')}C / {ult.count('V')}V / {ult.count('E')}E"
-
-def bolha_cor(r):
-    return {
-        "C": "🟥",
-        "V": "🟦",
-        "E": "🟨",
-        "🔽": "⬇️"
-    }.get(r, "⬜")
-
-def sugestao(h):
-    valores = get_valores(h)
-    if not valores:
-        return "Insira resultados para gerar previsão."
-    ult = valores[-1] if valores else ""
-    seq = sequencia_final(h)
-    eco = eco_visual_por_linha(h)
-    parcial = eco_parcial_por_linha(h)
-    contagens = {
-        "C": valores.count("C"),
-        "V": valores.count("V"),
-        "E": valores.count("E")
-    }
-
-    if seq >= 5 and ult in ["C", "V"]:
-        cor_inversa = "V" if ult == "C" else "C"
-        return f"🔁 Sequência de {seq} {bolha_cor(ult)} - Possível reversão para {bolha_cor(cor_inversa)}"
-    if ult == "E":
-        return "🟨 Empate recente - Instável, possível 🟥 ou 🟦"
+def analyze_repeating_line_patterns(history, history_lines):
+    """
+    Analisa se uma linha específica (definida por ANALYSIS_LINE_INDEX) está se repetindo
+    e tenta identificar o padrão de continuação.
+    """
+    suggestions = []
     
-    # CORREÇÃO APLICADA AQUI - SINTAXE CORRIGIDA
-    condicao_parcial = False
-    if isinstance(parcial, str):
-        condicao_parcial = any(parcial.startswith(d) for d in ["6", "7", "8", "9"])
+    # Verifica se há linhas suficientes para analisar a linha alvo
+    if len(history_lines) <= ANALYSIS_LINE_INDEX:
+        return suggestions 
+
+    target_line = history_lines[ANALYSIS_LINE_INDEX]
+    target_line_str = "".join(target_line)
+
+    found_matches = []
+    # Percorre todas as linhas no histórico (exceto a linha alvo)
+    for i, current_line in enumerate(history_lines):
+        if i == ANALYSIS_LINE_INDEX: 
+            continue # Não compara a linha com ela mesma
+
+        current_line_str = "".join(current_line)
         
-    if eco == "Detectado" or condicao_parcial:
-        return f"🔄 Padrão repetido - Sugere manter {bolha_cor(ult)}"
+        # Compara a linha alvo com a linha atual do loop.
+        # Verifica se são idênticas ou se a linha atual é um prefixo da linha alvo.
+        # Isso ajuda a pegar padrões que ainda estão sendo "formados" na linha alvo.
+        if target_line_str == current_line_str:
+            found_matches.append({'index_line': i, 'line_content': current_line, 'type': 'Exata'})
+        elif target_line_str.startswith(current_line_str):
+             found_matches.append({'index_line': i, 'line_content': current_line, 'type': 'Prefixo'})
+
+
+    if found_matches:
+        reason_base = f"A linha atual (índice {ANALYSIS_LINE_INDEX+1} - '{target_line_str}') foi detectada como similar a padrões anteriores."
+        
+        # Tenta prever a próxima cor baseada no que veio após a linha em correspondências passadas.
+        potential_next_colors = Counter()
+        for match in found_matches:
+            # Calcular o índice no histórico ORIGINAL (não invertido) onde a linha de correspondência termina
+            # history_lines[match['index_line']] corresponde ao que veio ANTES no histórico original.
+            # O índice 0 em history_lines é a linha mais RECENTE.
+            # Então, para um match em history_lines[i], o fim dessa linha no histórico original
+            # seria: (total_de_linhas - 1 - i) * LINE_LENGTH + len(match['line_content']) - 1 (se a linha estiver completa)
+            
+            # Mais simples: A entrada no histórico original que corresponde ao INÍCIO da linha de match
+            start_index_in_original = len(history) - ((match['index_line'] + 1) * LINE_LENGTH)
+            # A entrada no histórico original que corresponde ao FIM da linha de match
+            end_index_in_original = start_index_in_original + len(match['line_content']) -1
+            
+            # Se existe uma próxima entrada no histórico original após essa linha de correspondência
+            if end_index_in_original + 1 < len(history):
+                next_entry = history[end_index_in_original + 1]
+                potential_next_colors[next_entry] += 1
+            
+        if potential_next_colors:
+            most_likely_next, count = potential_next_colors.most_common(1)[0]
+            total_next = sum(potential_next_colors.values())
+            confidence = round((count / total_next) * 100)
+            
+            suggestions.append({
+                'type': 'Repetição de Linha (Continuação Padrão)',
+                'suggestion': most_likely_next,
+                'confidence': confidence,
+                'reason': f"{reason_base} Com base em ocorrências anteriores de padrões similares, a próxima cor mais comum foi **{COLOR_MAP[most_likely_next]['name']}** ({count}/{total_next} vezes)."
+            })
+        else: # Se não há continuação clara, sugere a cor mais comum na própria linha
+            color_counts_target_line = Counter(target_line)
+            if color_counts_target_line:
+                most_common_color_in_line, _ = color_counts_target_line.most_common(1)[0]
+                suggestions.append({
+                    'type': 'Repetição de Linha (Cor Dominante)',
+                    'suggestion': most_common_color_in_line,
+                    'confidence': 60, # Confiança um pouco menor se não houver um "próximo" claro
+                    'reason': f"{reason_base} A cor dominante nesta linha repetida é **{COLOR_MAP[most_common_color_in_line]['name']}**. Pode continuar."
+                })
+
+    return suggestions
+
+
+def analyze_general_patterns(history):
+    """
+    Função para análise de padrões mais gerais como transições e quebra de sequência,
+    complementar à análise de repetição de linhas.
+    """
+    suggestions = []
+    if len(history) < 2: # Precisa de um mínimo de resultados para certas análises
+        return suggestions
+
+    # Análise de Transições (o que vem depois da última cor)
+    last_color = history[-1]
+    transitions = {c: Counter() for c in COLOR_MAP.keys()}
+    for i in range(len(history) - 1):
+        transitions[history[i]][history[i+1]] += 1
+
+    if last_color in transitions and transitions[last_color]:
+        most_likely_next_transition, count_transition = transitions[last_color].most_common(1)[0]
+        total_transitions = sum(transitions[last_color].values())
+        confidence = round((count_transition / total_transitions) * 100)
+        suggestions.append({
+            'type': 'Transição Mais Frequente',
+            'suggestion': most_likely_next_transition,
+            'confidence': confidence,
+            'reason': f"Após **{COLOR_MAP[last_color]['name']}**, a cor **{COLOR_MAP[most_likely_next_transition]['name']}** apareceu {count_transition} de {total_transitions} vezes no histórico."
+        })
+
+    # Análise de "Quebra de Padrão" (quando há muitas repetições da mesma cor)
+    consecutive_count = 0
+    if history:
+        last_val = history[-1]
+        for i in reversed(range(len(history))):
+            if history[i] == last_val:
+                consecutive_count += 1
+            else:
+                break
     
-    maior = max(contagens, key=contagens.get)
-    return f"📊 Tendência favorece {bolha_cor(maior)} ({maior})"
+    if consecutive_count >= 3: # Sugere uma quebra após 3 ou mais resultados consecutivos
+        opposite_colors = [c for c in COLOR_MAP.keys() if c != last_val]
+        # Aqui, poderíamos adicionar lógica para escolher a "oposta" mais provável,
+        # mas por simplicidade, pegamos a primeira que não seja a cor atual.
+        if opposite_colors:
+            suggestions.append({
+                'type': 'Quebra de Sequência Longa',
+                'suggestion': opposite_colors[0], 
+                'confidence': 60, # Confiança média, pois não é um padrão exato
+                'reason': f"Foram **{consecutive_count}** resultados consecutivos de **{COLOR_MAP[last_val]['name']}**. Há uma chance de quebra de padrão."
+            })
+    
+    return suggestions
 
-# Interface
-st.set_page_config(page_title="📊 Football Studio - Estratégia", layout="wide")
-st.title("📊 Football Studio - Estratégia")
+def calculate_stats(history):
+    """Calcula estatísticas de ocorrência percentual das cores no histórico."""
+    total = len(history)
+    counts = Counter(history)
+    stats = {
+        'total': total,
+        'percentages': {color: round((counts[color] / total) * 100) if total > 0 else 0 for color in COLOR_MAP.keys()},
+        'counts': dict(counts)
+    }
+    return stats
 
-# Header com botão de limpar
-col_title, col_clear = st.columns([4, 1])
-with col_title:
-    st.header("Análise em Tempo Real")
-with col_clear:
-    if st.button("🧹 Limpar Histórico", use_container_width=True):
-        st.session_state.historico = []
-        st.experimental_rerun()
+# --- Interface Streamlit ---
+st.set_page_config(layout="wide", page_title="Football Studio Analyzer Inteligente")
 
-# Botões de ação
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.button("🟥 Casa (C)", key="btn_casa", on_click=lambda: adicionar_resultado("C"), 
-              use_container_width=True, help="Registrar vitória da Casa")
-with col2:
-    st.button("🟦 Visitante (V)", key="btn_visitante", on_click=lambda: adicionar_resultado("V"), 
-              use_container_width=True, help="Registrar vitória do Visitante")
-with col3:
-    st.button("🟨 Empate (E)", key="btn_empate", on_click=lambda: adicionar_resultado("E"), 
-              use_container_width=True, help="Registrar empate")
-with col4:
-    st.button("🔄 Novo Baralho", key="btn_baralho", on_click=lambda: adicionar_resultado("🔽"), 
-              use_container_width=True, help="Iniciar novo baralho")
+# Inicializa o histórico na sessão do Streamlit se ainda não existir
+# Isso garante que o estado é mantido entre reruns
+if 'history' not in st.session_state:
+    st.session_state.history = load_history()
 
-h = st.session_state.historico
+# Injeção de CSS personalizado para estilização (Tailwind-like)
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #f0f2f6; /* Cor de fundo geral */
+        color: #333;
+    }
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        max-width: 1200px; /* Limita a largura do conteúdo */
+    }
+    h1, h2, h3 {
+        color: #1a202c; /* Cores de título mais escuras */
+    }
+    .stButton>button {
+        width: 100%;
+        padding: 1rem 0;
+        border-radius: 0.5rem;
+        font-weight: bold;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        transition: background-color 0.2s ease-in-out;
+    }
+    /* Estilos específicos para os botões de resultado */
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(1) { /* Botão Casa */
+        background-color: #EF4444; border: none; color: white;
+    }
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(1):hover { background-color: #DC2626; }
 
-# Sugestão de entrada
-st.subheader("🎯 Sugestão de Entrada")
-st.markdown(f"""
-<div class="sugestao-box">
-    {sugestao(h)}
-</div>
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(2) { /* Botão Visitante */
+        background-color: #3B82F6; border: none; color: white;
+    }
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(2):hover { background-color: #2563EB; }
+
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(3) { /* Botão Empate */
+        background-color: #FACC15; border: none; color: black;
+    }
+    .stButton button[data-testid="stButton-primary"]:nth-of-type(3):hover { background-color: #EAB308; }
+
+    .color-box {
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+        border: 2px solid #D1D5DB; /* lightgray-300 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.875rem; /* text-sm */
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Pequena sombra */
+    }
+    .suggestion-box {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Sombra mais pronunciada */
+    }
+    .confidence-high { border-color: #22C55E; background-color: #ECFDF5; } /* green-500, green-50 */
+    .confidence-medium { border-color: #FBBF24; background-color: #FFFBEB; } /* yellow-500, yellow-50 */
+    .confidence-low { border-color: #EF4444; background-color: #FEF2F2; } /* red-500, red-50 */
+</style>
 """, unsafe_allow_html=True)
 
-# Histórico visual em grid 3x9
-st.subheader("🧾 Histórico Visual (Zona Ativa: 3 Linhas)")
-valores_para_grid = get_valores(h)[-27:]  # Últimos 27 valores válidos
+st.title("⚽ Football Studio - Analisador de Padrões Inteligente")
+st.markdown("Analise o histórico de resultados, com foco na **identificação de padrões de linhas que se repetem**, para auxiliar nas suas decisões.")
 
-# Preencher com espaços vazios se necessário
-while len(valores_para_grid) < 27:
-    valores_para_grid.insert(0, " ")  # Preencher no início para manter a ordem
-
-# Dividir em 3 linhas de 9 colunas (Linha 1 = mais antiga, Linha 3 = mais recente)
-linhas = [
-    valores_para_grid[0:9],   # Linha 1 (mais antiga)
-    valores_para_grid[9:18],  # Linha 2
-    valores_para_grid[18:27]  # Linha 3 (mais recente)
-]
-
-# Exibir as 3 linhas
-for i, linha in enumerate(linhas):
-    linha_num = i + 1
-    st.markdown(f"<div class='linha-label'>Linha {linha_num}</div>", unsafe_allow_html=True)
-    st.markdown("<div class='grid-container'>", unsafe_allow_html=True)
-    
-    for j, valor in enumerate(linha):
-        # Destacar o último item da última linha
-        destaque = (i == 2 and j == 8) and valor != " "
-        classe = "grid-item grid-item-recente" if destaque else "grid-item"
-        st.markdown(f"<div class='{classe}'>{bolha_cor(valor)}</div>", unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# Painel de análise
-st.subheader("📊 Análise dos Últimos 27 Jogadas")
-
-# Criar cards para os totais
+# --- Seção de Adição de Resultado ---
+st.header("Adicionar Novo Resultado")
 col1, col2, col3 = st.columns(3)
+
+# Botões de adição de resultado
 with col1:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>🟥 Casa</h4>
-        <div>{}</div>
-    </div>
-    """.format(get_valores(h).count("C")), unsafe_allow_html=True)
+    if st.button("🔴 Casa (R)", key="add_R"):
+        st.session_state.history.append('R')
+        save_history(st.session_state.history)
+        st.rerun() # Recarrega a página para atualizar as análises
 
 with col2:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>🟦 Visitante</h4>
-        <div>{}</div>
-    </div>
-    """.format(get_valores(h).count("V")), unsafe_allow_html=True)
+    if st.button("🔵 Visitante (B)", key="add_B"):
+        st.session_state.history.append('B')
+        save_history(st.session_state.history)
+        st.rerun()
 
 with col3:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>🟨 Empates</h4>
-        <div>{}</div>
-    </div>
-    """.format(get_valores(h).count("E")), unsafe_allow_html=True)
+    if st.button("🟡 Empate (Y)", key="add_Y"):
+        st.session_state.history.append('Y')
+        save_history(st.session_state.history)
+        st.rerun()
 
-# Outras métricas
-col4, col5, col6 = st.columns(3)
-with col4:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>📏 Maior Sequência</h4>
-        <div>{}</div>
-    </div>
-    """.format(maior_sequencia(h)), unsafe_allow_html=True)
+st.markdown("---")
 
-with col5:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>⏱️ Sequência Atual</h4>
-        <div>{}</div>
-    </div>
-    """.format(sequencia_final(h)), unsafe_allow_html=True)
+# --- Estatísticas ---
+st.header("Estatísticas Atuais")
+stats = calculate_stats(st.session_state.history)
 
-with col6:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>🔀 Alternância</h4>
-        <div>{}</div>
-    </div>
-    """.format(alternancia(h)), unsafe_allow_html=True)
-
-# Métricas adicionais
-col7, col8, col9 = st.columns(3)
-with col7:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>🔍 Eco Visual</h4>
-        <div>{}</div>
-    </div>
-    """.format(eco_visual_por_linha(h)), unsafe_allow_html=True)
-
-with col8:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>🔎 Eco Parcial</h4>
-        <div>{}</div>
-    </div>
-    """.format(eco_parcial_por_linha(h)), unsafe_allow_html=True)
-
-with col9:
-    st.markdown("""
-    <div class="metric-card">
-        <h4>📊 Última Linha</h4>
-        <div>{}</div>
-    </div>
-    """.format(tendencia_final(h)), unsafe_allow_html=True)
-
-# Alertas estratégicos
-st.subheader("🚨 Alertas Estratégicos")
-alertas = []
-valores = get_valores(h)
-
-if sequencia_final(h) >= 5 and valores and valores[-1] in ["C", "V"]:
-    alertas.append(f"🟥 Sequência de {sequencia_final(h)} - Possível inversão iminente")
-if eco_visual_por_linha(h) == "Detectado":
-    alertas.append("🔁 Eco visual detectado - Possível repetição de padrão")
-if isinstance(eco_parcial_por_linha(h), str) and any(eco_parcial_por_linha(h).startswith(d) for d in ["6", "7", "8", "9"]):
-    alertas.append("🧠 Eco parcial - Padrão reescrito com alta similaridade")
-if dist_empates(h) == "1 jogadas":
-    alertas.append("🟨 Empates consecutivos - Alta instabilidade no jogo")
-if blocos_espelhados(h) >= 1:
-    alertas.append("🧩 Bloco espelhado - Padrão reflexivo detectado")
-
-if not alertas:
-    st.info("✅ Nenhum padrão crítico identificado. Jogo dentro da normalidade estatística.")
+if stats['total'] == 0:
+    st.info("Adicione resultados para ver as estatísticas de ocorrência.")
 else:
-    for alerta in alertas:
-        st.markdown(f'<div class="alerta-box">{alerta}</div>', unsafe_allow_html=True)
+    # Exibição das estatísticas em colunas com cores personalizadas
+    col_stats_1, col_stats_2, col_stats_3, col_stats_4 = st.columns(4)
+    with col_stats_1:
+        st.markdown(f"""
+        <div style="background-color: #60A5FA; color: white; padding: 1rem; border-radius: 0.5rem;">
+            <div style="font-size: 0.875rem; opacity: 0.9;">Total de Jogos</div>
+            <div style="font-size: 1.8rem; font-weight: bold;">{stats['total']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_stats_2:
+        st.markdown(f"""
+        <div style="background-color: {COLOR_MAP['R']['color_hex']}; color: white; padding: 1rem; border-radius: 0.5rem;">
+            <div style="font-size: 0.875rem; opacity: 0.9;">Casa (Home)</div>
+            <div style="font-size: 1.5rem; font-weight: bold;">{stats['percentages']['R']}%</div>
+            <div style="font-size: 0.875rem; opacity: 0.9;">({stats['counts'].get('R', 0)} jogos)</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_stats_3:
+        st.markdown(f"""
+        <div style="background-color: {COLOR_MAP['B']['color_hex']}; color: white; padding: 1rem; border-radius: 0.5rem;">
+            <div style="font-size: 0.875rem; opacity: 0.9;">Visitante (Away)</div>
+            <div style="font-size: 1.5rem; font-weight: bold;">{stats['percentages']['B']}%</div>
+            <div style="font-size: 0.875rem; opacity: 0.9;">({stats['counts'].get('B', 0)} jogos)</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_stats_4:
+        st.markdown(f"""
+        <div style="background-color: {COLOR_MAP['Y']['color_hex']}; color: {COLOR_MAP['Y']['text_color']}; padding: 1rem; border-radius: 0.5rem;">
+            <div style="font-size: 0.875rem; opacity: 0.9;">Empate (Draw)</div>
+            <div style="font-size: 1.5rem; font-weight: bold;">{stats['percentages']['Y']}%</div>
+            <div style="font-size: 0.875rem; opacity: 0.9;">({stats['counts'].get('Y', 0)} jogos)</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-# Notas explicativas
-st.markdown("""
----
-**📝 Notas Explicativas:**
-- **Eco Visual**: Compara a linha atual com a anterior (9 jogadas)
-- **Eco Parcial**: Conta quantas jogadas são iguais ou do mesmo tipo (Casa/Visitante)
-- **Blocos Espelhados**: Sequências de 3 jogadas que se repetem invertidas
-- **Alternância**: Número de vezes que o resultado mudou entre jogadas consecutivas
-""")
+st.markdown("---")
+
+# --- Histórico Visual ---
+st.header("Histórico de Jogos (Mais Recente Primeiro)")
+
+history_lines = get_history_lines(st.session_state.history)
+
+if not history_lines:
+    st.info("O histórico está vazio. Adicione um resultado para começar a análise visual e de padrões.")
+else:
+    for i, line in enumerate(history_lines):
+        # O primeiro elemento da coluna é para o número da linha
+        cols = st.columns([0.05] + [1] * LINE_LENGTH) 
+        
+        # Número da linha (i+1 para começar do 1, e marcamos a linha de análise)
+        line_label = f"{i+1}"
+        if i == ANALYSIS_LINE_INDEX:
+            line_label = f"**{i+1}**" # Destaca a linha de análise
+        cols[0].markdown(f"<div style='font-size: 0.75rem; color: gray; width: 30px; display: flex; align-items: center; justify-content: center;'>{line_label}</div>", unsafe_allow_html=True)
+        
+        for j, color in enumerate(line):
+            color_info = COLOR_MAP[color]
+            cols[j+1].markdown(f"""
+            <div class="color-box" style="background-color: {color_info['color_hex']}; color: {color_info['text_color']};">
+                {color}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Preencher espaços vazios com caixas cinzas se a linha não estiver completa
+        for j in range(len(line), LINE_LENGTH):
+            cols[j+1].markdown("""
+            <div class="color-box" style="background-color: #E5E7EB; color: #9CA3AF;">-</div>
+            """, unsafe_allow_html=True)
+    
+    st.caption(f"A **análise de repetição de linha** está focada na **linha {ANALYSIS_LINE_INDEX + 1}** (contando a partir da mais recente no histórico).")
+
+st.markdown("---")
+
+# --- Sugestões Inteligentes ---
+st.header("Sugestões de Entrada Inteligentes")
+
+all_suggestions = []
+
+# 1. Análise de Repetição de Linha (principal foco e a nova inteligência)
+line_repetition_suggestions = analyze_repeating_line_patterns(st.session_state.history, history_lines)
+all_suggestions.extend(line_repetition_suggestions)
+
+# 2. Análise de Padrões Gerais (complementar)
+general_pattern_suggestions = analyze_general_patterns(st.session_state.history)
+all_suggestions.extend(general_pattern_suggestions)
+
+if not all_suggestions:
+    st.info("Adicione mais resultados ao histórico para que a IA possa analisar e gerar sugestões. A análise de 'repetição de linha' precisa de um histórico mais longo para identificar padrões.")
+else:
+    for suggestion in all_suggestions:
+        color_info = COLOR_MAP[suggestion['suggestion']]
+        
+        # Determina a classe CSS da caixa de sugestão com base na confiança
+        confidence_class = "confidence-low"
+        if suggestion['confidence'] >= 70:
+            confidence_class = "confidence-high"
+        elif suggestion['confidence'] >= 50:
+            confidence_class = "confidence-medium"
+
+        st.markdown(f"""
+        <div class="suggestion-box {confidence_class}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: bold; color: #1F2937;">{suggestion['type']}</span>
+                <span style="font-size: 0.875rem; background-color: #E5E7EB; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">
+                    {suggestion['confidence']}% confiança
+                </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="color-box" style="background-color: {color_info['color_hex']}; color: {color_info['text_color']};">
+                    {suggestion['suggestion']}
+                </div>
+                <span style="font-weight: 500; color: #374151;">
+                    Próxima sug. → **{color_info['name']}**
+                </span>
+            </div>
+            <div style="font-size: 0.875rem; color: #4B5563; margin-top: 0.5rem;">
+                {suggestion['reason']}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+st.markdown("---")
+
+# --- Botão de Limpar Histórico ---
+# Adiciona uma chave única para o botão, como boa prática no Streamlit
+if st.button("🗑️ Limpar Histórico", key="clear_history_btn"):
+    st.session_state.history = []
+    save_history([]) # Garante que o arquivo também seja limpo
+    st.rerun() # Recarrega a página para refletir o histórico limpo
+
+st.caption("Desenvolvido por seu Engenheiro de Computação para análise de padrões em Football Studio.")
+
