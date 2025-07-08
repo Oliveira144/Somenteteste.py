@@ -7,6 +7,12 @@ def load_css():
     /* Estilos gerais */
     body {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f9fafb;
+    }
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
     }
     
     /* Estilos para os botões */
@@ -64,14 +70,6 @@ def load_css():
     }
     .grid-item-recente {
         box-shadow: 0 0 0 3px #ff4b4b;
-        animation: pulse 1.5s infinite;
-    }
-    
-    /* Animação para destaque */
-    @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
-        70% { box-shadow: 0 0 0 10px rgba(255, 75, 75, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
     }
     
     /* Estilos para os cards de análise */
@@ -257,8 +255,15 @@ def sugestao(h):
         return f"🔁 Sequência de {seq} {bolha_cor(ult)} - Possível reversão para {bolha_cor(cor_inversa)}"
     if ult == "E":
         return "🟨 Empate recente - Instável, possível 🟥 ou 🟦"
-    if eco == "Detectado" or (isinstance(parcial, str) and parcial.startswith(("6", "7", "8", "9")):
+    
+    # CORREÇÃO APLICADA AQUI - SINTAXE CORRIGIDA
+    condicao_parcial = False
+    if isinstance(parcial, str):
+        condicao_parcial = any(parcial.startswith(d) for d in ["6", "7", "8", "9"])
+        
+    if eco == "Detectado" or condicao_parcial:
         return f"🔄 Padrão repetido - Sugere manter {bolha_cor(ult)}"
+    
     maior = max(contagens, key=contagens.get)
     return f"📊 Tendência favorece {bolha_cor(maior)} ({maior})"
 
@@ -419,9 +424,9 @@ if sequencia_final(h) >= 5 and valores and valores[-1] in ["C", "V"]:
     alertas.append(f"🟥 Sequência de {sequencia_final(h)} - Possível inversão iminente")
 if eco_visual_por_linha(h) == "Detectado":
     alertas.append("🔁 Eco visual detectado - Possível repetição de padrão")
-if isinstance(eco_parcial_por_linha(h), str) and eco_parcial_por_linha(h).startswith(("6", "7", "8", "9")):
+if isinstance(eco_parcial_por_linha(h), str) and any(eco_parcial_por_linha(h).startswith(d) for d in ["6", "7", "8", "9"]):
     alertas.append("🧠 Eco parcial - Padrão reescrito com alta similaridade")
-if dist_empates(h) == 1:
+if dist_empates(h) == "1 jogadas":
     alertas.append("🟨 Empates consecutivos - Alta instabilidade no jogo")
 if blocos_espelhados(h) >= 1:
     alertas.append("🧩 Bloco espelhado - Padrão reflexivo detectado")
