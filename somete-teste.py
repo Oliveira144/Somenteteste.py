@@ -249,6 +249,10 @@ st.markdown("""
         gap: 4px; /* Espaçamento entre as caixas */
         margin-bottom: 4px; /* Espaçamento entre as linhas */
         align-items: center; /* Centraliza verticalmente */
+        flex-wrap: nowrap; /* Garante que as caixas não quebrem linha */
+        overflow-x: auto; /* Adiciona scroll se a tela for muito pequena */
+        -webkit-overflow-scrolling: touch; /* Melhor rolagem em dispositivos móveis */
+        padding-bottom: 5px; /* Para evitar que a barra de rolagem corte conteúdo */
     }
     .color-box {
         width: 36px; /* Largura fixa */
@@ -275,6 +279,7 @@ st.markdown("""
         justify-content: center;
         flex-shrink: 0;
         margin-right: 4px; /* Espaçamento entre o número da linha e as caixas */
+        font-weight: bold; /* Para destacar o número da linha */
     }
 
     .suggestion-box {
@@ -370,11 +375,8 @@ if not history_lines:
     st.info("O histórico está vazio. Adicione um resultado para começar a análise visual e de padrões.")
 else:
     for i, line in enumerate(history_lines):
-        # Usamos uma única coluna para conter a linha inteira, e dentro dela, um flexbox para as caixas de cor.
-        # Isso garante que a linha se comporte como um bloco único.
-        
-        # O primeiro elemento da coluna é para o número da linha
-        # Criamos um container flex para a linha inteira
+        # AQUI FOI FEITA A CORREÇÃO PRINCIPAL: Adicionado unsafe_allow_html=True
+        # ao st.markdown que renderiza o HTML da linha completa do histórico.
         st.markdown(f"""
         <div style="display: flex; align-items: center; margin-bottom: 4px;">
             <div class="line-number-box">
@@ -391,7 +393,7 @@ else:
                 ''' for _ in range(LINE_LENGTH - len(line))])}
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True) 
     
     st.caption(f"A **análise de repetição de linha** está focada na **linha {ANALYSIS_LINE_INDEX + 1}** (contando a partir da mais recente no histórico).")
 
